@@ -36,7 +36,7 @@ local MODES = {
 }
 
 local whitespace = lpeg.S(" \t") ^ 0
-local newline = (lpeg.P("\r\n") + lpeg.P("\n\r") + lpeg.P("\r") + lpeg.P("\n")) ^ 1
+local newline = lpeg.S("\r\n") ^ 1
 
 local v = lpeg.P(1) - lpeg.S("\r\n")
 local comment = lpeg.P(";") * (v ^ 0)

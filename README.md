@@ -30,6 +30,12 @@ To build the project:
 $ luarocks --local make
 ```
 
+To run the test suite:
+
+```
+$ luarocks --local test
+```
+
 ## Installing LuaRocks
 
 [LuaRocks](https://luarocks.org/) is used for package management.
