@@ -1,0 +1,4 @@
+{
+  "Lua.workspace.library": ["${3rd}/busted", "${3rd}/luassert/library"],
+  "Lua.workspace.checkThirdParty": false
+}
