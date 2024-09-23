@@ -22,3 +22,12 @@ dependencies = {
 build = {
    type = "builtin"
 }
+test_dependencies = {
+   "busted ~> 2.2.0-1"
+}
+test = {
+   type = "busted",
+   flags = {
+      "--lpath=./lua/?.lua"
+   }
+}
