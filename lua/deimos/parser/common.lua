@@ -36,27 +36,28 @@ local MODES = {
 }
 
 local whitespace = lpeg.S(" \t") ^ 0
-local newline = (lpeg.P("\r\n") + lpeg.P("\n\r") + lpeg.P("\r") + lpeg.P("\n")) ^ 1
+local newline = lpeg.S("\r\n") ^ 1
 
 local v = lpeg.P(1) - lpeg.S("\r\n")
 local comment = lpeg.P(";") * (v ^ 0)
 
 local dot = lpeg.P(".") * whitespace
 local comma = lpeg.P(",") * whitespace
-local org = lpeg.P("ORG") * whitespace
+local org = (lpeg.P("ORG") + lpeg.P("org")) * whitespace
 
 local number = ((lpeg.S("+-") ^ -1) * (lpeg.R("09") ^ 1) * whitespace) / tonumber
 
 local function one_of(strings)
     local parser = nil
     for _, str in ipairs(strings) do
+        local str_parser = lpeg.P(str) + lpeg.P(string.lower(str))
         if parser == nil then
-            parser = lpeg.P(str)
+            parser = str_parser
         else
-            parser = parser + lpeg.P(str)
+            parser = parser + str_parser
         end
     end
-    return lpeg.C(parser)
+    return parser / string.upper
 end
 
 local opcode = one_of(OPCODES) * whitespace

@@ -27,10 +27,8 @@ local load_file = (c.newline ^ 0) * list * (c.newline ^ 0) * lpeg.P(-1)
 ---Parse a load file into a list of instructions
 ---@param input string Source code for load file
 ---@return any[] | nil # List of instructions, or nil if parse failed
-local function parse(input)
+local function parse_load_file(input)
     return load_file:match(input)
 end
 
-return {
-    parse = parse
-}
+return parse_load_file
