@@ -50,7 +50,7 @@ local number = ((lpeg.S("+-") ^ -1) * (lpeg.R("09") ^ 1) * whitespace) / tonumbe
 local function one_of(strings)
     local parser = nil
     for _, str in ipairs(strings) do
-        str_parser = lpeg.P(str) + lpeg.P(string.lower(str))
+        local str_parser = lpeg.P(str) + lpeg.P(string.lower(str))
         if parser == nil then
             parser = str_parser
         else
