@@ -1,4 +1,4 @@
-# deimos
+# deimos ![test](https://github.com/cw-arena/deimos/actions/workflows/test.yml/badge.svg)
 
 `deimos` is an implementation of MARS, the Memory Array Redcode Simulator. It supports the extended ICWS '94 Redcode standard used in pMARS and other simulators.
 
