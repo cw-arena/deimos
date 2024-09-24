@@ -8,5 +8,9 @@ jobs:
       - uses: awalsh128/cache-apt-pkgs-action@v1.4.2
         with:
           packages: luarocks
+      - uses: actions/cache@v3
+        with:
+          key: ${{ hashFiles('./*.rockspec') }}
+          path: ~/.luarocks
       - run: luarocks --local make
       - run: luarocks --local test
