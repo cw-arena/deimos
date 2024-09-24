@@ -5,5 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: apt-get update -y && apt-get install -yyq luarocks
+      - uses: awalsh128/cache-apt-pkgs-action@v1.4.2
+        with:
+          packages: luarocks
       - run: luarocks --local test
