@@ -3,10 +3,11 @@ local Mode = {
     Immediate = "#",
     Direct = "$",
     Indirect = "@",
-    PreDecrementA = "{",
-    PostDecrementA = "}",
+    -- TODO: Support pMARS ICWS 94 extensions
+    -- PreDecrementA = "{",
+    -- PostDecrementA = "}",
     PreDecrementB = "<",
-    PostDecrementB = ">",
+    PostIncrementB = ">",
 }
 
 ---@enum Modifier
@@ -36,6 +37,9 @@ local Opcode = {
     CMP = "CMP",
     SLT = "SLT",
     SPL = "SPL",
+    -- TODO: Support pMARS ICWS 94 extensions
+    -- LDP = "LDP",
+    -- STP = "STP",
 }
 
 ---@enum MatchStatus

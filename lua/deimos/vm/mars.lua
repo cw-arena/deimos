@@ -26,7 +26,7 @@ end
 ---@field warriors_by_id table<string, Warrior>
 local Mars = {}
 
----@alias MarsOptions { core_size?: integer, initial_insn?: Insn }
+---@alias MarsOptions { core_size?: integer, initial_insn?: Insn, read_distance?: integer, write_distance?: integer }
 
 ---Create a new [Mars](lua://Mars)
 ---@param options MarsOptions
@@ -40,6 +40,14 @@ function Mars:new(options)
         warriors_by_id = {},
     }
 
+    -- TODO: Validate core size > 0
+    -- TODO: Validate cycles before tie > 0
+    -- TODO: Validate instruction limit
+    -- TODO: Validate maxNumTasks > 0
+    -- TODO: Validate read/write distance (> 0, multiple of core size)
+    -- TODO: Validate minimum separation > 0
+    -- TODO: Validate separation > 0 or RANDOM
+
     setmetatable(o, self)
     self.__index = self
     return o
@@ -48,14 +56,7 @@ end
 ---Prepare for a new match
 ---@param programs WarriorProgram[] Participating warrior programs
 function Mars:initialize(programs)
-    -- TODO: Validate core size > 0
-    -- TODO: Validate cycles before tie > 0
-    -- TODO: Validate instruction limit
-    -- TODO: Validate maxNumTasks > 0
-    -- TODO: Validate read/write distance (> 0, multiple of core size)
-    -- TODO: Validate minimum separation > 0
-    -- TODO: Validate separation > 0 or RANDOM
-    -- TODO: Validate numWarriors = warriors.length && numWarriors > 1
+    -- TODO: Validate #programs = num_warriors.length && num_warriors > 1
 
     local options = self.options
     local core_size = options.core_size or DEFAULT_CORE_SIZE
@@ -119,9 +120,9 @@ function Mars:execute_warrior_insn(warrior)
     local task = warrior.tasks:dequeue() --[[@as WarriorTask]]
 
     -- TODO: Implement 'warrior.step' hook here
-    local insn = self.core[task.pc + 1]
-
-    -- TODO: Compute A-number and B-number
+    local insn = self.core[self:index(task.pc)]
+    local a_operand = self:compute_operand(task.pc, "A")
+    local b_operand = self:compute_operand(task.pc, "B")
 
     -- TODO: Implement all opcode handlers
     ---@type table<Opcode, fun(): WarriorTaskUpdate>
@@ -154,4 +155,72 @@ function Mars:execute_warrior_insn(warrior)
         -- TODO: Implement 'warrior.died' hook here
         self.warriors_by_id[warrior.id] = nil
     end
+end
+
+---Wrap an offset based on maximum allowed limit
+---@param core_size integer Number of instructions in core
+---@param limit integer Maximum allowed distance
+---@param offset integer Current offset
+---@return integer # The clamped offset
+local function clamp(core_size, limit, offset)
+    offset = offset % limit
+    if offset > math.floor(limit / 2) then
+        offset = offset + core_size - limit
+    end
+    return offset
+end
+
+---Get the core index for a program counter
+---@param pc integer Address of instruction
+---@return integer # Instruction index into core
+function Mars:index(pc)
+    return (pc % #self.core) + 1
+end
+
+---Compute the A-number/B-number of an A-operand/B-operand.
+---@param pc integer Address of instruction
+---@param operand ("A" | "B") Which number to compute
+function Mars:compute_operand(pc, operand)
+    local read_offset = 0
+    local write_offset = 0
+
+    ---@type nil | integer
+    local post_inc_pc = nil
+
+    local insn = self.core[self:index(pc)]
+    local mode = (operand == "A" and insn.aMode) or insn.bMode
+    local value = (operand == "A" and insn.aValue) or insn.bValue
+
+    if mode ~= types.Mode.Immediate then
+        read_offset = clamp(#self.core, self.options.read_distance, value)
+        write_offset = clamp(#self.core, self.options.write_distance, value)
+
+        if mode ~= types.Mode.Direct then
+            -- TODO: Add support for PreDecrementA, PostIncrementA here
+            if mode == types.Mode.PreDecrementB then
+                local predec_b_insn = self.core[self:index(pc + write_offset)]
+                predec_b_insn.bValue = (predec_b_insn.bValue + #self.core - 1) % #self.core
+            elseif mode == types.Mode.PostIncrementB then
+                post_inc_pc = pc + write_offset
+            end
+            read_offset = read_offset + self.core[self:index(pc + read_offset)].bValue
+            read_offset = clamp(#self.core, self.options.read_distance, read_offset)
+            write_offset = write_offset + self.core[self:index(pc + write_offset)].bValue
+            write_offset = clamp(#self.core, self.options.write_distance, write_offset)
+        end
+    end
+
+    if post_inc_pc ~= nil then
+        local post_inc_index = self:index(post_inc_pc)
+        self.core[post_inc_index].bValue = self.core[post_inc_index].bValue + 1
+    end
+
+    local read_pc = (pc + read_offset) % #self.core
+    local write_pc = (pc + write_offset) % #self.core
+
+    return {
+        insn = self.core[self:index(read_pc)],
+        read_pc = read_pc,
+        write_pc = write_pc
+    }
 end
