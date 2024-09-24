@@ -14,6 +14,7 @@ local instruction = c.opcode * c.dot * c.modifier
             bNumber = bNumber
         }
     end)
+local single_instruction = instruction * lpeg.P(-1)
 
 local org_instruction = c.org * c.number * (c.comment ^ -1)
     / (function(addr)
@@ -28,7 +29,7 @@ local load_file = (c.newline ^ 0) * list * (c.newline ^ 0) * lpeg.P(-1)
 ---@param input string Source code for instruction
 ---@return Insn | nil # Instruction or nil if parse failed
 local function parse_insn(input)
-    return instruction:match(input)
+    return single_instruction:match(input)
 end
 
 ---Parse a load file into a list of instructions
