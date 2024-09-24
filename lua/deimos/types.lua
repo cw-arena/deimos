@@ -38,16 +38,23 @@ local Opcode = {
     SPL = "SPL",
 }
 
+---@enum MatchStatus
+local MatchStatus = {
+    RUNNING = "RUNNING",
+    WIN = "WIN",
+    TIE = "TIE",
+}
+
 ---@alias Insn { opcode: Opcode, modifier: Modifier, aMode: Mode, aValue: integer, bMode: Mode, bValue: integer }
 
 ---@alias WarriorMetadata { name?: string, author?: string, strategy?: string }
----@alias WarriorProgram { id: string, metadata: WarriorMetadata }
-
----@alias TaskID integer
----@alias Address integer
----@alias Warrior { program: WarriorProgram, next_task_id: integer, tasks: [TaskID, Address] }
+---@alias WarriorProgram { metadata: WarriorMetadata, insns: Insn[] }
+---@alias WarriorTask { id: number, pc: integer }
+---@alias WarriorTaskUpdate { next_pc?: integer, new_pc?: integer }
+---@alias Warrior { id: string, tasks: TaskQueue, next_task_id: integer, program: WarriorProgram }
 
 return {
+    MatchStatus = MatchStatus,
     Mode = Mode,
     Modifier = Modifier,
     Opcode = Opcode,

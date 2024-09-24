@@ -27,16 +27,24 @@ local load_file = (c.newline ^ 0) * list * (c.newline ^ 0) * lpeg.P(-1)
 
 ---Parse a single instruction
 ---@param input string Source code for instruction
----@return Insn | nil # Instruction or nil if parse failed
+---@return Insn | nil # Parsed instruction, or nil if parse failed
 local function parse_insn(input)
     return single_instruction:match(input)
 end
 
----Parse a load file into a list of instructions
+---Parse a load file into a program
 ---@param input string Source code for load file
----@return Insn[] | nil # List of instructions or nil if parse failed
+---@return WarriorProgram | nil # Parsed program, or nil if parse failed
 local function parse_load_file(input)
-    return load_file:match(input)
+    local insns = load_file:match(input) --[[@as Insn[] | nil]]
+    if insns == nil then
+        return nil
+    end
+    return {
+        -- TODO: Extract metadata from comments
+        metadata = {},
+        insns = insns,
+    }
 end
 
 return {
