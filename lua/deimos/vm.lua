@@ -1,65 +1,11 @@
----@enum Mode
-local Mode = {
-    Immediate = "#",
-    Direct = "$",
-    Indirect = "@",
-    PreDecrementA = "{",
-    PostDecrementA = "}",
-    PreDecrementB = "<",
-    PostDecrementB = ">",
-}
+local types = require "deimos.types"
+local load_file = require "deimos.parser.load_file"
 
----@enum Modifier
-local Modifier = {
-    A = "A",
-    B = "B",
-    AB = "AB",
-    BA = "BA",
-    F = "F",
-    X = "X",
-    I = "I",
-}
-
----@enum Opcode
-local Opcode = {
-    DAT = "DAT",
-    MOV = "MOV",
-    ADD = "ADD",
-    SUB = "SUB",
-    MUL = "MUL",
-    DIV = "DIV",
-    MOD = "MOD",
-    JMP = "JMP",
-    JMZ = "JMZ",
-    JMN = "JMN",
-    DJN = "DJN",
-    CMP = "CMP",
-    SLT = "SLT",
-    SPL = "SPL",
-}
-
----@alias Insn { opcode: Opcode, modifier: Modifier, aMode: Mode, aValue: integer, bMode: Mode, bValue: integer }
-
----@alias WarriorMetadata { name?: string, author?: string, strategy?: string }
----@alias WarriorProgram { id: string, metadata: WarriorMetadata }
-
----@alias TaskID integer
----@alias Address integer
----@alias Warrior { program: WarriorProgram, next_task_id: integer, tasks: [TaskID, Address] }
-
----
-local DEFAULT_CORE_SIZE <const> = 8000
+local DEFAULT_CORE_SIZE = 8000
 
 ---Instruction used to initialize core
 ---@type Insn
-local INITIAL_INSN <const> = {
-    opcode = Opcode.DAT,
-    modifier = Modifier.F,
-    aMode = Mode.Indirect,
-    aValue = 0,
-    bMode = Mode.Indirect,
-    bValue = 0,
-}
+local INITIAL_INSN = load_file.parse_insn("DAT.F #0, #0") --[[@as Insn]]
 
 ---Make a copy of a table
 ---@param table table The table to copy

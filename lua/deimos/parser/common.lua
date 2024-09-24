@@ -1,39 +1,5 @@
 local lpeg = require "lpeg"
-
-local OPCODES = {
-    "DAT",
-    "MOV",
-    "ADD",
-    "SUB",
-    "MUL",
-    "DIV",
-    "MOD",
-    "JMP",
-    "JMZ",
-    "JMN",
-    "DJN",
-    "CMP",
-    "SLT",
-    "SPL",
-}
-
-local MODIFIERS = {
-    "AB",
-    "BA",
-    "A",
-    "B",
-    "F",
-    "X",
-    "I"
-}
-
-local MODES = {
-    "#",
-    "$",
-    "@",
-    "<",
-    ">"
-}
+local types = require "deimos.types"
 
 local whitespace = lpeg.S(" \t") ^ 0
 local newline = lpeg.S("\r\n") ^ 1
@@ -47,22 +13,32 @@ local org = (lpeg.P("ORG") + lpeg.P("org")) * whitespace
 
 local number = ((lpeg.S("+-") ^ -1) * (lpeg.R("09") ^ 1) * whitespace) / tonumber
 
-local function one_of(strings)
+---Create a parser that accepts any value in an enum
+---@param enum table<string, string>
+local function parse_enum(enum)
+    -- NB: Sort the enum values by length descending to match greedily
+    ---@type string[]
+    local values = {}
+    for _, value in pairs(enum) do
+        table.insert(values, value)
+    end
+    table.sort(values, function(a, b) return string.len(a) > string.len(b) end)
+
     local parser = nil
-    for _, str in ipairs(strings) do
-        local str_parser = lpeg.P(str) + lpeg.P(string.lower(str))
+    for _, value in ipairs(values) do
+        local str_parser = lpeg.P(value) + lpeg.P(string.lower(value))
         if parser == nil then
             parser = str_parser
         else
             parser = parser + str_parser
         end
     end
-    return parser / string.upper
+    return (parser / string.upper) * whitespace
 end
 
-local opcode = one_of(OPCODES) * whitespace
-local modifier = one_of(MODIFIERS) * whitespace
-local mode = one_of(MODES) * whitespace
+local opcode = parse_enum(types.Opcode)
+local modifier = parse_enum(types.Modifier)
+local mode = parse_enum(types.Mode)
 
 return {
     comma = comma,

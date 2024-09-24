@@ -1,4 +1,9 @@
 {
-  "Lua.workspace.library": ["${3rd}/busted", "${3rd}/luassert/library"],
+  "Lua.runtime.version": "Lua 5.1",
+  "Lua.workspace.library": [
+    "/home/case/.vscode-server/data/User/globalStorage/sumneko.lua/addonManager/addons/lpeg/module/library",
+    "${3rd}/luassert/library",
+    "/home/case/.vscode-server/data/User/globalStorage/sumneko.lua/addonManager/addons/busted/module/library"
+  ],
   "Lua.workspace.checkThirdParty": false
 }

@@ -1,4 +1,4 @@
-local parse_load_file = require "deimos.parser.parse_load_file"
+local load_file = require "deimos.parser.load_file"
 
 describe("parse_load_file", function()
     it("can parse a complete load file", function()
@@ -10,7 +10,7 @@ describe("parse_load_file", function()
                 { opcode = "MOV", modifier = "I",  aMode = "$", aNumber = -2, bMode = "@", bNumber = -2 },
                 { opcode = "JMP", modifier = "A",  aMode = "$", aNumber = -2, bMode = "#", bNumber = 0 }
             },
-            parse_load_file([[
+            load_file.parse_load_file([[
                 ;redcode
 
                 ;name          Dwarf

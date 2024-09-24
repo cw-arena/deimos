@@ -24,11 +24,21 @@ local line = c.whitespace * ((c.comment + instruction + org_instruction) ^ 0)
 local list = lpeg.Ct(line * ((c.newline * line) ^ 0))
 local load_file = (c.newline ^ 0) * list * (c.newline ^ 0) * lpeg.P(-1)
 
+---Parse a single instruction
+---@param input string Source code for instruction
+---@return Insn | nil # Instruction or nil if parse failed
+local function parse_insn(input)
+    return instruction:match(input)
+end
+
 ---Parse a load file into a list of instructions
 ---@param input string Source code for load file
----@return any[] | nil # List of instructions, or nil if parse failed
+---@return Insn[] | nil # List of instructions or nil if parse failed
 local function parse_load_file(input)
     return load_file:match(input)
 end
 
-return parse_load_file
+return {
+    parse_insn = parse_insn,
+    parse_load_file = parse_load_file,
+}
