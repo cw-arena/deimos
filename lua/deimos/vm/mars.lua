@@ -259,19 +259,31 @@ function Mars:execute_warrior_insn(warrior)
             end
             return { next_pc = (task.pc + offset) % #self.core }
         end,
+        [types.Opcode.CMP] = function()
+            local offset = 1
+            local cond = false
+            if insn.modifier == types.Modifier.I then
+                cond = a_operand.insn.opcode == b_operand.insn.opcode
+                    and a_operand.insn.modifier == b_operand.insn.modifier
+                    and a_operand.insn.aMode == b_operand.insn.aMode
+                    and a_operand.insn.aNumber == b_operand.insn.aNumber
+                    and a_operand.insn.bMode == b_operand.insn.bMode
+                    and a_operand.insn.bNumber == b_operand.insn.bNumber
+            else
+                local pairs = utils.zip(a_lens:get(), b_lens:get())
+                cond = utils.every(pairs, function(p) return p[1] == p[2] end)
+            end
+            if cond then
+                offset = offset + 1
+            end
+            return { next_pc = (task.pc + offset) % #self.core }
+        end,
         [types.Opcode.SPL] = function()
             return {
                 next_pc = (task.pc + 1) % #self.core,
                 new_pc = a_operand.write_pc
             }
         end
-        --     [Opcode.CMP]: ({ aOperand, bOperand, aValue, bValue, pc, insn }) => {
-        --       const cond =
-        --         insn.modifier === Modifier.I
-        --           ? aOperand.insn.equals(bOperand.insn)
-        --           : aValue.zip(bValue).every(([a, b]) => a === b);
-        --       return { nextPointer: pc.add(cond ? 2 : 1) };
-        --     },
     }
 
     local handler = opcode_handlers[insn.opcode]
