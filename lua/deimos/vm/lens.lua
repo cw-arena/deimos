@@ -31,6 +31,19 @@ function Lens:set(xs)
     self._set(xs)
 end
 
+---Update value(s) focused by lens
+---@param f fun(x: number): number Value mapping function
+---@return integer[] # The value(s) that were set
+function Lens:update(f)
+    local xs = self._get()
+    local ys = {}
+    for i = 1, #xs do
+        table.insert(ys, f(xs[i]))
+    end
+    self._set(ys)
+    return ys
+end
+
 ---Create lens focused on A-number
 ---@param insn Insn # Instruction to focus on
 ---@return Lens

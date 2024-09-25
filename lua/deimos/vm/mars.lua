@@ -243,17 +243,20 @@ function Mars:execute_warrior_insn(warrior)
             end
             return { next_pc = next_pc }
         end,
+        [types.Opcode.DJN] = function()
+            local next_pc = (task.pc + 1) % #self.core
+            local xs = b_lens:update(function(x) return x - 1 end)
+            if utils.every(xs, function(v) return v ~= 0 end) then
+                next_pc = a_operand.read_pc
+            end
+            return { next_pc = next_pc }
+        end,
         [types.Opcode.SPL] = function()
             return {
                 next_pc = (task.pc + 1) % #self.core,
                 new_pc = a_operand.write_pc
             }
         end
-        --     [Opcode.DJN]: ({ aOperand, bValue, pc }) => ({
-        --       nextPointer: bValue.update((v) => v - 1).every((v) => v !== 0)
-        --         ? aOperand.readPointer
-        --         : pc.add(1),
-        --     }),
         --     [Opcode.CMP]: ({ aOperand, bOperand, aValue, bValue, pc, insn }) => {
         --       const cond =
         --         insn.modifier === Modifier.I
