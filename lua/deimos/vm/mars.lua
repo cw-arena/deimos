@@ -1,12 +1,13 @@
-local load_file = require "deimos.parser.load_file"
-local types = require "deimos.types"
-local TaskQueue = require "deimos.vm.task_queue"
+local load_file         = require "deimos.parser.load_file"
+local types             = require "deimos.types"
+local TaskQueue         = require "deimos.vm.task_queue"
+local lens              = require "deimos.vm.lens"
 
 local DEFAULT_CORE_SIZE = 8000
 
 ---Instruction used to initialize core
 ---@type Insn
-local INITIAL_INSN = load_file.parse_insn("DAT.F #0, #0") --[[@as Insn]]
+local INITIAL_INSN      = load_file.parse_insn("DAT.F #0, #0") --[[@as Insn]]
 
 ---Make a copy of a table
 ---@param table table The table to copy
@@ -72,16 +73,23 @@ function Mars:initialize(programs)
 
     local pc = 0
     for id, program in ipairs(programs) do
-        self.warriors_by_id[id] = {
+        local j = 1
+        local org = 0
+        for _, insn in ipairs(program.insns) do
+            if insn["org"] ~= nil then
+                org = insn["org"]
+            else
+                self.core[pc + j] = clone(insn)
+                j = j + 1
+            end
+        end
+
+        self.warriors_by_id[tostring(id)] = {
             id = tostring(id),
-            tasks = TaskQueue:new({ id = 0, pc = pc }),
+            tasks = TaskQueue:new({ id = 0, pc = pc + org }),
             next_task_id = 1,
             program = program,
         }
-
-        for i, insn in ipairs(program.insns) do
-            self.core[pc + i] = clone(insn)
-        end
 
         -- TODO: Support random/minimum separation
         pc = pc + #program.insns + 1
@@ -114,22 +122,143 @@ function Mars:get_match_state()
     }
 end
 
+---@type table<Modifier, [LensFactory, LensFactory]>
+local MODIFIER_LENS_FACTORIES = {
+    [types.Modifier.A] = { lens.a, lens.a },
+    [types.Modifier.B] = { lens.b, lens.b },
+    [types.Modifier.AB] = { lens.a, lens.b },
+    [types.Modifier.BA] = { lens.b, lens.a },
+    [types.Modifier.F] = { lens.ab, lens.ab },
+    [types.Modifier.I] = { lens.ab, lens.ab },
+    [types.Modifier.X] = { lens.ab, lens.ba },
+}
+
+---@alias OpcodeHandler fun(): WarriorTaskUpdate
+
+---@type table<Opcode, fun(x: integer, y: integer): integer?>
+local BINOPS = {
+    [types.Opcode.ADD] = function(x, y) return x + y end,
+    [types.Opcode.SUB] = function(x, y) return x + y end,
+    [types.Opcode.MUL] = function(x, y) return x + y end,
+    [types.Opcode.DIV] = function(x, y)
+        if y == 0 then
+            return nil
+        end
+        return math.floor(x / y)
+    end,
+    [types.Opcode.MOD] = function(x, y)
+        if y == 0 then
+            return nil
+        end
+        return x % y
+    end,
+}
+
 ---Execute a single instruction from a warrior
 ---@param warrior Warrior Warrior to execute instruction from
 function Mars:execute_warrior_insn(warrior)
     local task = warrior.tasks:dequeue() --[[@as WarriorTask]]
+    -- print("")
+    -- print(string.format("task: id=>%d, pc=%d", task.id, task.pc))
 
     -- TODO: Implement 'warrior.step' hook here
-    local insn = self.core[self:index(task.pc)]
+    local insn = self:fetch(task.pc)
+    -- print(string.format("insn=>%s", types.formatInsn(insn)))
+
     local a_operand = self:compute_operand(task.pc, "A")
     local b_operand = self:compute_operand(task.pc, "B")
 
+    local lens_factories = MODIFIER_LENS_FACTORIES[insn.modifier]
+    if lens_factories == nil then
+        error(string.format("unknown modifier %s at PC=%d", insn.modifier, task.pc))
+    end
+
+    -- print(string.format("a_insn=>%s, a_read_pc=>%d", types.formatInsn(a_operand.insn), a_operand.read_pc))
+    -- print(string.format("b_insn=>%s, b_read_pc=>%d", types.formatInsn(b_operand.insn), b_operand.read_pc))
+
+    local a_lens = lens_factories[1](a_operand.insn)
+    local b_lens = lens_factories[2](b_operand.insn)
+
+    ---Generate an opcode handler for an arithmetic operation
+    ---@param opcode Opcode Arithmetic opcode to handle
+    ---@return OpcodeHandler
+    local handle_arithmetic_opcode = function(opcode)
+        return function()
+            -- print(string.format("performing arith op %s", opcode))
+
+            local update = { next_pc = (task.pc + 1) % #self.core }
+
+            local as = a_lens:get()
+            local bs = b_lens:get()
+
+            -- print(string.format("%d (#%d elems)", as[1], #as))
+            -- print(string.format("%d (#%d elems)", bs[1], #bs))
+
+            for i = 1, #bs do
+                local result = BINOPS[opcode](bs[i], as[i])
+                if result == nil then
+                    update = {}
+                    break
+                end
+
+                bs[i] = result
+                b_lens:set(bs)
+            end
+
+            return update
+        end
+    end
+
     -- TODO: Implement all opcode handlers
-    ---@type table<Opcode, fun(): WarriorTaskUpdate>
+    ---@type table<Opcode, OpcodeHandler>
     local opcode_handlers = {
-        [types.Opcode.DAT] = function()
-            return {}
+        [types.Opcode.DAT] = function() return {} end,
+        [types.Opcode.MOV] = function()
+            if insn.modifier == types.Modifier.I then
+                -- print(string.format("writing %s to PC=%d", types.formatInsn(a_operand.insn), b_operand.write_pc))
+                self:set(b_operand.write_pc, clone(a_operand.insn))
+            else
+                b_lens:set(a_lens:get())
+            end
+            return { next_pc = (task.pc + 1) % #self.core }
         end,
+        [types.Opcode.ADD] = handle_arithmetic_opcode(types.Opcode.ADD),
+        [types.Opcode.SUB] = handle_arithmetic_opcode(types.Opcode.SUB),
+        [types.Opcode.MUL] = handle_arithmetic_opcode(types.Opcode.MUL),
+        [types.Opcode.DIV] = handle_arithmetic_opcode(types.Opcode.DIV),
+        [types.Opcode.MOD] = handle_arithmetic_opcode(types.Opcode.MOD),
+        [types.Opcode.JMP] = function() return { next_pc = a_operand.read_pc } end,
+        --     [Opcode.JMZ]: ({ aOperand, bValue, pc }) => ({
+        --       nextPointer: bValue.get().every((v) => v === 0)
+        --         ? aOperand.readPointer
+        --         : pc.add(1),
+        --     }),
+        --     [Opcode.JMN]: ({ aOperand, bValue, pc }) => ({
+        --       nextPointer: bValue.get().every((v) => v !== 0)
+        --         ? aOperand.readPointer
+        --         : pc.add(1),
+        --     }),
+        --     [Opcode.DJN]: ({ aOperand, bValue, pc }) => ({
+        --       nextPointer: bValue.update((v) => v - 1).every((v) => v !== 0)
+        --         ? aOperand.readPointer
+        --         : pc.add(1),
+        --     }),
+        --     [Opcode.CMP]: ({ aOperand, bOperand, aValue, bValue, pc, insn }) => {
+        --       const cond =
+        --         insn.modifier === Modifier.I
+        --           ? aOperand.insn.equals(bOperand.insn)
+        --           : aValue.zip(bValue).every(([a, b]) => a === b);
+        --       return { nextPointer: pc.add(cond ? 2 : 1) };
+        --     },
+        --     [Opcode.SLT]: ({ aValue, bValue, pc }) => {
+        --       const cond = aValue.zip(bValue).every(([a, b]) => a < b);
+        --       return { nextPointer: pc.add(cond ? 2 : 1) };
+        --     },
+        --     [Opcode.SPL]: ({ aOperand, pc }) => ({
+        --       nextPointer: pc.add(1),
+        --       newTaskPointer: aOperand.writePointer,
+        --     }),
+        --   };
     }
 
     local handler = opcode_handlers[insn.opcode]
@@ -171,11 +300,25 @@ local function clamp(core_size, limit, addr, offset)
     return (addr + offset) % core_size
 end
 
----Get the core index for a program counter
----@param pc integer Address of instruction
----@return integer # Instruction index into core
-function Mars:index(pc)
-    return (pc % #self.core) + 1
+local function resolve(core_size, addr)
+    while addr < 0 do
+        addr = addr + core_size
+    end
+    return (addr % core_size) + 1
+end
+
+---Get the instruction at an address
+---@param addr integer Address of instruction
+---@return Insn
+function Mars:fetch(addr)
+    return self.core[resolve(#self.core, addr)]
+end
+
+---Set the instruction at an address
+---@param addr integer Address of instruction
+---@param insn Insn Instruction to set
+function Mars:set(addr, insn)
+    self.core[resolve(#self.core, addr)] = insn
 end
 
 ---Compute the A-number/B-number of an A-operand/B-operand.
@@ -185,43 +328,44 @@ function Mars:compute_operand(pc, operand)
     local read_distance = self.options.read_distance or #self.core
     local write_distance = self.options.write_distance or #self.core
 
-    local read_pc = 0
-    local write_pc = 0
+    local read_pc = pc
+    local write_pc = pc
 
     ---@type nil | integer
     local post_inc_pc = nil
 
-    local insn = self.core[self:index(pc)]
+    local insn = self:fetch(pc)
     local mode = (operand == "A" and insn.aMode) or insn.bMode
     local value = (operand == "A" and insn.aNumber) or insn.bNumber
+    -- print(string.format("operand=>%s, mode=>%s, value=>%d", operand, mode, value))
 
     if mode ~= types.Mode.Immediate then
-        read_pc = clamp(#self.core, read_distance, pc, value)
-        write_pc = clamp(#self.core, write_distance, pc, value)
+        read_pc = clamp(#self.core, read_distance, read_pc, value)
+        write_pc = clamp(#self.core, write_distance, write_pc, value)
 
         if mode ~= types.Mode.Direct then
             -- TODO: Add support for PreDecrementA
             if mode == types.Mode.PreDecrementB then
-                local predec_insn = self.core[self:index(write_pc)]
+                local predec_insn = self:fetch(write_pc)
                 predec_insn.bNumber = (predec_insn.bNumber + #self.core - 1) % #self.core
                 -- TODO: Add support for PostIncrementA
             elseif mode == types.Mode.PostIncrementB then
                 post_inc_pc = write_pc
             end
 
-            read_pc = clamp(#self.core, read_distance, read_pc, self.core[self:index(read_pc)].bNumber)
-            write_pc = clamp(#self.core, write_distance, write_pc, self.core[self:index(write_pc)].bNumber)
+            read_pc = clamp(#self.core, read_distance, read_pc, self:fetch(read_pc).bNumber)
+            write_pc = clamp(#self.core, write_distance, write_pc, self:fetch(write_pc).bNumber)
         end
     end
 
     -- TODO: Add support for PostIncrementA
     if post_inc_pc ~= nil then
-        local post_inc_index = self:index(post_inc_pc)
-        self.core[post_inc_index].bNumber = self.core[post_inc_index].bNumber + 1
+        local post_inc_insn = self:fetch(post_inc_pc)
+        post_inc_insn.bNumber = post_inc_insn.bNumber + 1
     end
 
     return {
-        insn = self.core[self:index(read_pc)],
+        insn = self:fetch(read_pc),
         read_pc = read_pc,
         write_pc = write_pc
     }

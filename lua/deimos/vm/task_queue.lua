@@ -22,7 +22,7 @@ function TaskQueue:new(...)
 end
 
 ---Remove a task from the front of the queue.
----@return WarriorTask # The removed task
+---@return WarriorTask # Removed task
 function TaskQueue:dequeue()
     local size = self.size
     if size == 0 then
@@ -49,6 +49,15 @@ end
 ---@return integer # The number of elements in the queue
 function TaskQueue:length()
     return self.size
+end
+
+---Inspect the task at the front of the queue without removing it.
+---@return WarriorTask # First task in queue
+function TaskQueue:peek()
+    if self.size == 0 then
+        error("empty queue")
+    end
+    return self[self.first]
 end
 
 return TaskQueue

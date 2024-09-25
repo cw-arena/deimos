@@ -4,7 +4,11 @@ local types = require "deimos.types"
 
 describe("Mars", function()
     describe("compute_operand", function()
-        local vm = Mars:new()
+        local vm = Mars:new({
+            core_size = 8000,
+            read_distance = 8000,
+            write_distance = 8000,
+        })
         vm:initialize({
             load_file.parse_load_file([[
                 DAT.F #123, #456  ; PC=0
@@ -87,5 +91,37 @@ describe("Mars", function()
                 write_pc = 8 - 4000 + #vm.core,
             }, vm:compute_operand(7, "A"))
         end)
+    end)
+
+    it("can execute a dwarf correctly", function()
+        local dwarf_file = assert(io.open("./warriors/dwarf.red", "r"))
+        local dwarf_code = dwarf_file:read("*a")
+        dwarf_file:close()
+
+        local program = load_file.parse_load_file(dwarf_code)
+        assert.is_not_nil(program)
+
+        local vm = Mars:new()
+        vm:initialize({ program })
+
+        assert.is_not_nil(vm.warriors_by_id["1"])
+        local warrior = vm.warriors_by_id["1"]
+
+        assert.is.equal("1", warrior.id)
+        assert.is.equal(1, warrior.next_task_id)
+        assert.are.same(program, warrior.program)
+        assert.is.equal(1, warrior.tasks:length())
+        assert.are.same({ id = 0, pc = 1 }, warrior.tasks:peek())
+
+        vm:execute_cycle()
+        assert.are.same({ id = 0, pc = 2 }, warrior.tasks:peek())
+        assert.are.same(load_file.parse_insn("DAT.F #0, #4"), vm.core[1])
+
+        vm:execute_cycle()
+        assert.are.same({ id = 0, pc = 3 }, warrior.tasks:peek())
+        assert.are.same(load_file.parse_insn("DAT.F #0, #4"), vm.core[5])
+
+        vm:execute_cycle()
+        assert.are.same({ id = 0, pc = 1 }, warrior.tasks:peek())
     end)
 end)
