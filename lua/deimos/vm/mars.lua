@@ -251,6 +251,14 @@ function Mars:execute_warrior_insn(warrior)
             end
             return { next_pc = next_pc }
         end,
+        [types.Opcode.SLT] = function()
+            local offset = 1
+            local pairs = utils.zip(a_lens:get(), b_lens:get())
+            if utils.every(pairs, function(p) return p[1] < p[2] end) then
+                offset = offset + 1
+            end
+            return { next_pc = (task.pc + offset) % #self.core }
+        end,
         [types.Opcode.SPL] = function()
             return {
                 next_pc = (task.pc + 1) % #self.core,
@@ -262,10 +270,6 @@ function Mars:execute_warrior_insn(warrior)
         --         insn.modifier === Modifier.I
         --           ? aOperand.insn.equals(bOperand.insn)
         --           : aValue.zip(bValue).every(([a, b]) => a === b);
-        --       return { nextPointer: pc.add(cond ? 2 : 1) };
-        --     },
-        --     [Opcode.SLT]: ({ aValue, bValue, pc }) => {
-        --       const cond = aValue.zip(bValue).every(([a, b]) => a < b);
         --       return { nextPointer: pc.add(cond ? 2 : 1) };
         --     },
     }
