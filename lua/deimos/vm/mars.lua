@@ -210,10 +210,18 @@ function Mars:execute_warrior_insn(warrior)
         end
     end
 
-    -- TODO: Implement all opcode handlers
     ---@type table<Opcode, OpcodeHandler>
     local opcode_handlers = {
-        [types.Opcode.DAT] = function() return {} end,
+        --[[ 5.5.1 DAT
+        No additional processing takes place.  This effectively removes the
+        current task from the current warrior's task queue. ]]
+        [types.Opcode.DAT] = function()
+            return {}
+        end,
+
+        --[[ 5.5.2 MOV
+        MOV replaces the B-target with the A-value and queues the next
+        instruction (PC + 1). ]]
         [types.Opcode.MOV] = function()
             if insn.modifier == types.Modifier.I then
                 -- print(string.format("writing %s to PC=%d", types.formatInsn(a_operand.insn), b_operand.write_pc))
@@ -223,12 +231,53 @@ function Mars:execute_warrior_insn(warrior)
             end
             return { next_pc = (task.pc + 1) % #self.core }
         end,
+
+        --[[ 5.5.3 ADD
+        ADD replaces the B-target with the sum of the A-value and the B-value
+        (A-value + B-value) and queues the next instruction (PC + 1).  ADD.I
+        functions as ADD.F would. ]]
         [types.Opcode.ADD] = handle_arithmetic_opcode(types.Opcode.ADD),
+
+        --[[ 5.5.4 SUB
+        SUB replaces the B-target with the difference of the B-value and the
+        A-value (B-value - A-value) and queues the next instruction (PC + 1).
+        SUB.I functions as SUB.F would. ]]
         [types.Opcode.SUB] = handle_arithmetic_opcode(types.Opcode.SUB),
+
+        --[[ 5.5.5 MUL
+        MUL replaces the B-target with the product of the A-value and the
+        B-value (A-value * B-value) and queues the next instruction (PC + 1).
+        MUL.I functions as MUL.F would. ]]
         [types.Opcode.MUL] = handle_arithmetic_opcode(types.Opcode.MUL),
+
+        --[[ 5.5.6 DIV
+        DIV replaces the B-target with the integral result of dividing the
+        B-value by the A-value (B-value / A-value) and queues the next
+        instruction (PC + 1).  DIV.I functions as DIV.F would. If the
+        A-value is zero, the B-value is unchanged and the current task is
+        removed from the warrior's task queue. ]]
         [types.Opcode.DIV] = handle_arithmetic_opcode(types.Opcode.DIV),
+
+        --[[ 5.5.7 MOD
+        MOD replaces the B-target with the integral remainder of dividing the
+        B-value by the A-value (B-value % A-value) and queues the next
+        instruction (PC + 1).  MOD.I functions as MOD.F would. If the
+        A-value is zero, the B-value is unchanged and the current task is
+        removed from the warrior's task queue. ]]
         [types.Opcode.MOD] = handle_arithmetic_opcode(types.Opcode.MOD),
-        [types.Opcode.JMP] = function() return { next_pc = a_operand.read_pc } end,
+
+        --[[ 5.5.8 JMP
+        JMP queues the sum of the program counter and the A-pointer. ]]
+        [types.Opcode.JMP] = function()
+            return { next_pc = a_operand.read_pc }
+        end,
+
+        --[[ 5.5.9 JMZ
+        JMZ tests the B-value to determine if it is zero.  If the B-value is
+        zero, the sum of the program counter and the A-pointer is queued.
+        Otherwise, the next instruction is queued (PC + 1).  JMZ.I functions
+        as JMZ.F would, i.e. it jumps if both the A-number and the B-number
+        of the B-instruction are zero. ]]
         [types.Opcode.JMZ] = function()
             local next_pc = (task.pc + 1) % #self.core
             if utils.every(b_lens:get(), function(v) return v == 0 end) then
@@ -236,6 +285,14 @@ function Mars:execute_warrior_insn(warrior)
             end
             return { next_pc = next_pc }
         end,
+
+        --[[ 5.5.10 JMN
+        JMN tests the B-value to determine if it is zero.  If the B-value is
+        not zero, the sum of the program counter and the A-pointer is queued.
+        Otherwise, the next instruction is queued (PC + 1).  JMN.I functions
+        as JMN.F would, i.e. it jumps if both the A-number and the B-number
+        of the B-instruction are non-zero. This is not the negation of the
+        condition for JMZ.F. ]]
         [types.Opcode.JMN] = function()
             local next_pc = (task.pc + 1) % #self.core
             if utils.every(b_lens:get(), function(v) return v ~= 0 end) then
@@ -243,6 +300,15 @@ function Mars:execute_warrior_insn(warrior)
             end
             return { next_pc = next_pc }
         end,
+
+        --[[ 5.5.11 DJN
+        DJN decrements the B-value and the B-target, then tests the B-value
+        to determine if it is zero.  If the decremented B-value is not zero,
+        the sum of the program counter and the A-pointer is queued.
+        Otherwise, the next instruction is queued (PC + 1).  DJN.I functions
+        as DJN.F would, i.e. it decrements both both A/B-numbers of the B-value
+        and the B-target, and jumps if both A/B-numbers of the B-value are
+        non-zero. ]]
         [types.Opcode.DJN] = function()
             local next_pc = (task.pc + 1) % #self.core
             local xs = b_lens:update(function(x) return x - 1 end)
@@ -251,14 +317,12 @@ function Mars:execute_warrior_insn(warrior)
             end
             return { next_pc = next_pc }
         end,
-        [types.Opcode.SLT] = function()
-            local offset = 1
-            local pairs = utils.zip(a_lens:get(), b_lens:get())
-            if utils.every(pairs, function(p) return p[1] < p[2] end) then
-                offset = offset + 1
-            end
-            return { next_pc = (task.pc + offset) % #self.core }
-        end,
+
+        --[[ 5.5.12 CMP
+        CMP compares the A-value to the B-value.  If the result of the
+        comparison is equal, the instruction after the next instruction
+        (PC + 2) is queued (skipping the next instruction).  Otherwise, the
+        the next instruction is queued (PC + 1). ]]
         [types.Opcode.CMP] = function()
             local offset = 1
             local cond = false
@@ -278,6 +342,25 @@ function Mars:execute_warrior_insn(warrior)
             end
             return { next_pc = (task.pc + offset) % #self.core }
         end,
+
+        --[[ 5.5.13 SLT
+        SLT compares the A-value to the B-value.  If the A-value is less than
+        the B-value, the instruction after the next instruction (PC + 2) is
+        queued (skipping the next instruction).  Otherwise, the next
+        instruction is queued (PC + 1).  SLT.I functions as SLT.F would.]]
+        [types.Opcode.SLT] = function()
+            local offset = 1
+            local pairs = utils.zip(a_lens:get(), b_lens:get())
+            if utils.every(pairs, function(p) return p[1] < p[2] end) then
+                offset = offset + 1
+            end
+            return { next_pc = (task.pc + offset) % #self.core }
+        end,
+
+        --[[ 5.5.14 SPL
+        SPL queues the next instruction (PC + 1) and then queues the sum of
+        the program counter and A-pointer. If the queue is full, only the
+        next instruction is queued.]]
         [types.Opcode.SPL] = function()
             return {
                 next_pc = (task.pc + 1) % #self.core,

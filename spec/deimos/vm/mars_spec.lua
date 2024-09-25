@@ -93,6 +93,51 @@ describe("Mars", function()
         end)
     end)
 
+    describe("execute_cycle", function()
+        describe("DIV", function()
+            it("kills warrior on divide by zero", function()
+                local program = load_file.parse_load_file("DIV.AB #0, #5")
+                assert.is_not_nil(program)
+
+                local vm = Mars:new()
+                vm:initialize({ program })
+                vm:execute_cycle()
+
+                local warrior = vm.warriors_by_id["1"]
+                assert.is_nil(warrior)
+            end)
+        end)
+
+        describe("MOD", function()
+            it("kills warrior on divide by zero", function()
+                local program = load_file.parse_load_file("MOD.AB #0, #5")
+                assert.is_not_nil(program)
+
+                local vm = Mars:new()
+                vm:initialize({ program })
+                vm:execute_cycle()
+
+                local warrior = vm.warriors_by_id["1"]
+                assert.is_nil(warrior)
+            end)
+        end)
+
+        describe("JMP", function()
+            it("jumps to A-pointer", function()
+                local program = load_file.parse_load_file("JMP.A $123, #0")
+                assert.is_not_nil(program)
+
+                local vm = Mars:new()
+                vm:initialize({ program })
+                vm:execute_cycle()
+
+                local warrior = vm.warriors_by_id["1"]
+                assert.is_not_nil(warrior)
+                assert.are.same({ id = 0, pc = 123 }, warrior.tasks:peek())
+            end)
+        end)
+    end)
+
     it("can execute a dwarf correctly", function()
         local dwarf_file = assert(io.open("./warriors/dwarf.red", "r"))
         local dwarf_code = dwarf_file:read("*a")
