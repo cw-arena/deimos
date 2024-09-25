@@ -2,6 +2,7 @@ local load_file         = require "deimos.parser.load_file"
 local types             = require "deimos.types"
 local TaskQueue         = require "deimos.vm.task_queue"
 local lens              = require "deimos.vm.lens"
+local utils             = require "deimos.utils"
 
 local DEFAULT_CORE_SIZE = 8000
 
@@ -228,16 +229,20 @@ function Mars:execute_warrior_insn(warrior)
         [types.Opcode.DIV] = handle_arithmetic_opcode(types.Opcode.DIV),
         [types.Opcode.MOD] = handle_arithmetic_opcode(types.Opcode.MOD),
         [types.Opcode.JMP] = function() return { next_pc = a_operand.read_pc } end,
-        --     [Opcode.JMZ]: ({ aOperand, bValue, pc }) => ({
-        --       nextPointer: bValue.get().every((v) => v === 0)
-        --         ? aOperand.readPointer
-        --         : pc.add(1),
-        --     }),
-        --     [Opcode.JMN]: ({ aOperand, bValue, pc }) => ({
-        --       nextPointer: bValue.get().every((v) => v !== 0)
-        --         ? aOperand.readPointer
-        --         : pc.add(1),
-        --     }),
+        [types.Opcode.JMZ] = function()
+            local next_pc = (task.pc + 1) % #self.core
+            if utils.every(b_lens:get(), function(v) return v == 0 end) then
+                next_pc = a_operand.read_pc
+            end
+            return { next_pc = next_pc }
+        end,
+        [types.Opcode.JMN] = function()
+            local next_pc = (task.pc + 1) % #self.core
+            if utils.every(b_lens:get(), function(v) return v ~= 0 end) then
+                next_pc = a_operand.read_pc
+            end
+            return { next_pc = next_pc }
+        end
         --     [Opcode.DJN]: ({ aOperand, bValue, pc }) => ({
         --       nextPointer: bValue.update((v) => v - 1).every((v) => v !== 0)
         --         ? aOperand.readPointer
