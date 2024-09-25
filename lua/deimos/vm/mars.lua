@@ -242,6 +242,12 @@ function Mars:execute_warrior_insn(warrior)
                 next_pc = a_operand.read_pc
             end
             return { next_pc = next_pc }
+        end,
+        [types.Opcode.SPL] = function()
+            return {
+                next_pc = (task.pc + 1) % #self.core,
+                new_pc = a_operand.write_pc
+            }
         end
         --     [Opcode.DJN]: ({ aOperand, bValue, pc }) => ({
         --       nextPointer: bValue.update((v) => v - 1).every((v) => v !== 0)
@@ -259,11 +265,6 @@ function Mars:execute_warrior_insn(warrior)
         --       const cond = aValue.zip(bValue).every(([a, b]) => a < b);
         --       return { nextPointer: pc.add(cond ? 2 : 1) };
         --     },
-        --     [Opcode.SPL]: ({ aOperand, pc }) => ({
-        --       nextPointer: pc.add(1),
-        --       newTaskPointer: aOperand.writePointer,
-        --     }),
-        --   };
     }
 
     local handler = opcode_handlers[insn.opcode]
