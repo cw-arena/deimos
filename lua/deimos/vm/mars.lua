@@ -29,12 +29,12 @@ local Mars = {}
 ---@alias MarsOptions { core_size?: integer, initial_insn?: Insn, read_distance?: integer, write_distance?: integer }
 
 ---Create a new [Mars](lua://Mars)
----@param options MarsOptions
+---@param options? MarsOptions
 ---@return Mars
 function Mars:new(options)
     ---@type Mars
     local o = {
-        options = options,
+        options = options or {},
         core = {},
         cycles = 0,
         warriors_by_id = {},
@@ -80,7 +80,7 @@ function Mars:initialize(programs)
         }
 
         for i, insn in ipairs(program.insns) do
-            self.core[pc + i + 1] = clone(insn)
+            self.core[pc + i] = clone(insn)
         end
 
         -- TODO: Support random/minimum separation
@@ -157,17 +157,18 @@ function Mars:execute_warrior_insn(warrior)
     end
 end
 
----Wrap an offset based on maximum allowed limit
+---Add offset to address while respecting distance limit
 ---@param core_size integer Number of instructions in core
 ---@param limit integer Maximum allowed distance
+---@param addr integer Initial address
 ---@param offset integer Current offset
 ---@return integer # The clamped offset
-local function clamp(core_size, limit, offset)
-    offset = offset % limit
+local function clamp(core_size, limit, addr, offset)
+    offset = (offset + core_size) % limit
     if offset > math.floor(limit / 2) then
         offset = offset + core_size - limit
     end
-    return offset
+    return (addr + offset) % core_size
 end
 
 ---Get the core index for a program counter
@@ -181,42 +182,43 @@ end
 ---@param pc integer Address of instruction
 ---@param operand ("A" | "B") Which number to compute
 function Mars:compute_operand(pc, operand)
-    local read_offset = 0
-    local write_offset = 0
+    local read_distance = self.options.read_distance or #self.core
+    local write_distance = self.options.write_distance or #self.core
+
+    local read_pc = 0
+    local write_pc = 0
 
     ---@type nil | integer
     local post_inc_pc = nil
 
     local insn = self.core[self:index(pc)]
     local mode = (operand == "A" and insn.aMode) or insn.bMode
-    local value = (operand == "A" and insn.aValue) or insn.bValue
+    local value = (operand == "A" and insn.aNumber) or insn.bNumber
 
     if mode ~= types.Mode.Immediate then
-        read_offset = clamp(#self.core, self.options.read_distance, value)
-        write_offset = clamp(#self.core, self.options.write_distance, value)
+        read_pc = clamp(#self.core, read_distance, pc, value)
+        write_pc = clamp(#self.core, write_distance, pc, value)
 
         if mode ~= types.Mode.Direct then
-            -- TODO: Add support for PreDecrementA, PostIncrementA here
+            -- TODO: Add support for PreDecrementA
             if mode == types.Mode.PreDecrementB then
-                local predec_b_insn = self.core[self:index(pc + write_offset)]
-                predec_b_insn.bValue = (predec_b_insn.bValue + #self.core - 1) % #self.core
+                local predec_insn = self.core[self:index(write_pc)]
+                predec_insn.bNumber = (predec_insn.bNumber + #self.core - 1) % #self.core
+                -- TODO: Add support for PostIncrementA
             elseif mode == types.Mode.PostIncrementB then
-                post_inc_pc = pc + write_offset
+                post_inc_pc = write_pc
             end
-            read_offset = read_offset + self.core[self:index(pc + read_offset)].bValue
-            read_offset = clamp(#self.core, self.options.read_distance, read_offset)
-            write_offset = write_offset + self.core[self:index(pc + write_offset)].bValue
-            write_offset = clamp(#self.core, self.options.write_distance, write_offset)
+
+            read_pc = clamp(#self.core, read_distance, read_pc, self.core[self:index(read_pc)].bNumber)
+            write_pc = clamp(#self.core, write_distance, write_pc, self.core[self:index(write_pc)].bNumber)
         end
     end
 
+    -- TODO: Add support for PostIncrementA
     if post_inc_pc ~= nil then
         local post_inc_index = self:index(post_inc_pc)
-        self.core[post_inc_index].bValue = self.core[post_inc_index].bValue + 1
+        self.core[post_inc_index].bNumber = self.core[post_inc_index].bNumber + 1
     end
-
-    local read_pc = (pc + read_offset) % #self.core
-    local write_pc = (pc + write_offset) % #self.core
 
     return {
         insn = self.core[self:index(read_pc)],
@@ -224,3 +226,5 @@ function Mars:compute_operand(pc, operand)
         write_pc = write_pc
     }
 end
+
+return Mars

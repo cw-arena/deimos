@@ -16,7 +16,7 @@ function TaskQueue:new(...)
     setmetatable(o, self)
     self.__index = self
     for i = 1, select("#", ...) do
-        self:enqueue(select(i, ...))
+        o:enqueue(select(i, ...))
     end
     return o
 end

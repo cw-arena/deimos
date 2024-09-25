@@ -40,6 +40,9 @@ local Opcode = {
     -- TODO: Support pMARS ICWS 94 extensions
     -- LDP = "LDP",
     -- STP = "STP",
+    -- SEQ = "SEQ",
+    -- SNE = "SNE",
+    -- NOP = "NOP",
 }
 
 ---@enum MatchStatus
@@ -49,7 +52,22 @@ local MatchStatus = {
     TIE = "TIE",
 }
 
----@alias Insn { opcode: Opcode, modifier: Modifier, aMode: Mode, aValue: integer, bMode: Mode, bValue: integer }
+---@alias Insn { opcode: Opcode, modifier: Modifier, aMode: Mode, aNumber: integer, bMode: Mode, bNumber: integer }
+
+---Pretty-print instruction into string
+---@param insn Insn # Instruction to format
+---@return string
+local function formatInsn(insn)
+    return string.format(
+        "%s.%s %s%d, %s%d",
+        insn.opcode,
+        insn.modifier,
+        insn.aMode,
+        insn.aNumber,
+        insn.bMode,
+        insn.bNumber
+    )
+end
 
 ---@alias WarriorMetadata { name?: string, author?: string, strategy?: string }
 ---@alias WarriorProgram { metadata: WarriorMetadata, insns: Insn[] }
@@ -62,4 +80,5 @@ return {
     Mode = Mode,
     Modifier = Modifier,
     Opcode = Opcode,
+    formatInsn = formatInsn,
 }
