@@ -1,5 +1,5 @@
 local Mars = require "deimos.vm.mars"
-local load_file = require "deimos.parser.load_file"
+local parser = require "deimos.parser"
 local types = require "deimos.types"
 
 describe("Mars", function()
@@ -10,7 +10,7 @@ describe("Mars", function()
             write_distance = 8000,
         })
         vm:initialize({
-            load_file.parse_load_file([[
+            parser.parse_load_file([[
                 DAT.F #123, #456  ; PC=0
                 ADD.AB $-1, $1    ; PC=1
                 JMP.A @-1, @0     ; PC=2
@@ -96,7 +96,7 @@ describe("Mars", function()
     describe("execute_cycle", function()
         describe("DIV", function()
             it("kills warrior on divide by zero", function()
-                local program = load_file.parse_load_file("DIV.AB #0, #5")
+                local program = parser.parse_load_file("DIV.AB #0, #5")
                 assert.is_not_nil(program)
 
                 local vm = Mars:new()
@@ -110,7 +110,7 @@ describe("Mars", function()
 
         describe("MOD", function()
             it("kills warrior on divide by zero", function()
-                local program = load_file.parse_load_file("MOD.AB #0, #5")
+                local program = parser.parse_load_file("MOD.AB #0, #5")
                 assert.is_not_nil(program)
 
                 local vm = Mars:new()
@@ -124,7 +124,7 @@ describe("Mars", function()
 
         describe("JMP", function()
             it("jumps to A-pointer", function()
-                local program = load_file.parse_load_file("JMP.A $123, #0")
+                local program = parser.parse_load_file("JMP.A $123, #0")
                 assert.is_not_nil(program)
 
                 local vm = Mars:new()
@@ -143,7 +143,7 @@ describe("Mars", function()
         local dwarf_code = dwarf_file:read("*a")
         dwarf_file:close()
 
-        local program = load_file.parse_load_file(dwarf_code)
+        local program = parser.parse_load_file(dwarf_code)
         assert.is_not_nil(program)
 
         local vm = Mars:new()
@@ -160,11 +160,11 @@ describe("Mars", function()
 
         vm:execute_cycle()
         assert.are.same({ id = 0, pc = 2 }, warrior.tasks:peek())
-        assert.are.same(load_file.parse_insn("DAT.F #0, #4"), vm.core[1])
+        assert.are.same(parser.parse_insn("DAT.F #0, #4"), vm.core[1])
 
         vm:execute_cycle()
         assert.are.same({ id = 0, pc = 3 }, warrior.tasks:peek())
-        assert.are.same(load_file.parse_insn("DAT.F #0, #4"), vm.core[5])
+        assert.are.same(parser.parse_insn("DAT.F #0, #4"), vm.core[5])
 
         vm:execute_cycle()
         assert.are.same({ id = 0, pc = 1 }, warrior.tasks:peek())

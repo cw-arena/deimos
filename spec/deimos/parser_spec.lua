@@ -1,5 +1,5 @@
-local load_file = require "deimos.parser.load_file"
-local types     = require "deimos.types"
+local parser = require "deimos.parser"
+local types  = require "deimos.types"
 
 describe("parse_instruction", function()
     it("can parse all opcodes", function()
@@ -14,7 +14,7 @@ describe("parse_instruction", function()
                     b_mode = types.Mode.Immediate,
                     b_number = 0
                 },
-                load_file.parse_insn(insn)
+                parser.parse_insn(insn)
             )
         end
     end)
@@ -31,7 +31,7 @@ describe("parse_instruction", function()
                     b_mode = types.Mode.Direct,
                     b_number = 1
                 },
-                load_file.parse_insn(insn)
+                parser.parse_insn(insn)
             )
         end
     end)
@@ -48,7 +48,7 @@ describe("parse_instruction", function()
                     b_mode = types.Mode.Direct,
                     b_number = 2
                 },
-                load_file.parse_insn(insn)
+                parser.parse_insn(insn)
             )
         end
     end)
@@ -63,12 +63,12 @@ describe("parse_instruction", function()
                 b_mode = types.Mode.Indirect,
                 b_number = -2,
             },
-            load_file.parse_insn("MOV.I $+2, @-2")
+            parser.parse_insn("MOV.I $+2, @-2")
         )
     end)
 
     it("rejects parse with trailing garbage", function()
-        assert.is_nil(load_file.parse_insn("MOV.I $0, $1 extra garbage"))
+        assert.is_nil(parser.parse_insn("MOV.I $0, $1 extra garbage"))
     end)
 end)
 
@@ -89,7 +89,7 @@ describe("parse_load_file", function()
                     { opcode = "JMP", modifier = "A",  a_mode = "$", a_number = -2, b_mode = "#", b_number = 0 }
                 }
             },
-            load_file.parse_load_file(dwarf_code)
+            parser.parse_load_file(dwarf_code)
         )
     end)
 end)

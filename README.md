@@ -4,9 +4,9 @@
 
 ## Features
 
-- Parsing of Redcode assembly and load files
-- Simulation with configurable runtime variables
-- Hook API for introspection during simulation
+- Parse Redcode load files
+- Execute programs in a configurable MARS environment
+- Introspect and modify the runtime with hooks
 
 ## Installation
 
