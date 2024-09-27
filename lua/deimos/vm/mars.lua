@@ -2,7 +2,7 @@ local Queue             = require "deimos.data.queue"
 local parser            = require "deimos.parser"
 local types             = require "deimos.types"
 local lens              = require "deimos.vm.lens"
-local utils             = require "deimos.utils"
+local tables            = require "deimos.tables"
 
 local DEFAULT_CORE_SIZE = 8000
 
@@ -10,23 +10,13 @@ local DEFAULT_CORE_SIZE = 8000
 ---@type Insn
 local INITIAL_INSN      = parser.parse_insn("DAT.F #0, #0") --[[@as Insn]]
 
----Make a copy of a table
----@param table table The table to copy
----@return table copy A shallow copy of the table
-local function clone(table)
-    local copy = {}
-    for k, v in pairs(table) do
-        copy[k] = v
-    end
-    return copy
-end
-
 ---@class Mars
 ---@field options MarsOptions
 ---@field core table<integer, Insn>
 ---@field cycles integer
 ---@field warriors_by_id table<string, Warrior>
-local Mars = {}
+---@field hooks table<string, Queue>
+local Mars              = {}
 
 ---@alias MarsOptions { core_size?: integer, initial_insn?: Insn, read_distance?: integer, write_distance?: integer }
 
@@ -40,6 +30,7 @@ function Mars:new(options)
         core = {},
         cycles = 0,
         warriors_by_id = {},
+        hooks = {}
     }
 
     -- TODO: Validate core size > 0
@@ -66,7 +57,7 @@ function Mars:initialize(programs)
 
     self.core = {}
     for _ = 1, core_size do
-        table.insert(self.core, clone(initial_insn))
+        table.insert(self.core, tables.clone(initial_insn))
     end
 
     self.cycles = 0
@@ -80,7 +71,7 @@ function Mars:initialize(programs)
             if insn["org"] ~= nil then
                 org = insn["org"]
             else
-                self.core[pc + j] = clone(insn)
+                self.core[pc + j] = tables.clone(insn)
                 j = j + 1
             end
         end
@@ -104,7 +95,7 @@ function Mars:execute_cycle()
     end
     local state = self:get_match_state()
     if state.status ~= types.MatchStatus.RUNNING then
-        -- TODO: Implement 'mars.end' hook here
+        self:process_hook("mars.end", state)
     end
     self.cycles = self.cycles + 1
 end
@@ -159,12 +150,14 @@ local BINOPS = {
 ---@param warrior Warrior Warrior to execute instruction from
 function Mars:execute_warrior_insn(warrior)
     local task = warrior.tasks:popleft() --[[@as WarriorTask]]
-    -- print("")
-    -- print(string.format("task: id=>%d, pc=%d", task.id, task.pc))
-
-    -- TODO: Implement 'warrior.step' hook here
     local insn = self:fetch(task.pc)
-    -- print(string.format("insn=>%s", types.formatInsn(insn)))
+
+    self:process_hook("warrior.step", {
+        cycle = self.cycles,
+        warrior = warrior,
+        pc = task.pc,
+        insn = insn
+    })
 
     local a_operand = self:compute_operand(task.pc, "A")
     local b_operand = self:compute_operand(task.pc, "B")
@@ -174,9 +167,6 @@ function Mars:execute_warrior_insn(warrior)
         error(string.format("unknown modifier %s at PC=%d", insn.modifier, task.pc))
     end
 
-    -- print(string.format("a_insn=>%s, a_read_pc=>%d", types.formatInsn(a_operand.insn), a_operand.read_pc))
-    -- print(string.format("b_insn=>%s, b_read_pc=>%d", types.formatInsn(b_operand.insn), b_operand.read_pc))
-
     local a_lens = lens_factories[1](a_operand.insn)
     local b_lens = lens_factories[2](b_operand.insn)
 
@@ -185,15 +175,10 @@ function Mars:execute_warrior_insn(warrior)
     ---@return OpcodeHandler
     local handle_arithmetic_opcode = function(opcode)
         return function()
-            -- print(string.format("performing arith op %s", opcode))
-
             local update = { next_pc = (task.pc + 1) % #self.core }
 
             local as = a_lens:get()
             local bs = b_lens:get()
-
-            -- print(string.format("%d (#%d elems)", as[1], #as))
-            -- print(string.format("%d (#%d elems)", bs[1], #bs))
 
             for i = 1, #bs do
                 local result = BINOPS[opcode](bs[i], as[i])
@@ -224,8 +209,7 @@ function Mars:execute_warrior_insn(warrior)
         instruction (PC + 1). ]]
         [types.Opcode.MOV] = function()
             if insn.modifier == types.Modifier.I then
-                -- print(string.format("writing %s to PC=%d", types.formatInsn(a_operand.insn), b_operand.write_pc))
-                self:set(b_operand.write_pc, clone(a_operand.insn))
+                self:set(b_operand.write_pc, tables.clone(a_operand.insn))
             else
                 b_lens:set(a_lens:get())
             end
@@ -280,7 +264,7 @@ function Mars:execute_warrior_insn(warrior)
         of the B-instruction are zero. ]]
         [types.Opcode.JMZ] = function()
             local next_pc = (task.pc + 1) % #self.core
-            if utils.every(b_lens:get(), function(v) return v == 0 end) then
+            if tables.every(b_lens:get(), function(v) return v == 0 end) then
                 next_pc = a_operand.read_pc
             end
             return { next_pc = next_pc }
@@ -295,7 +279,7 @@ function Mars:execute_warrior_insn(warrior)
         condition for JMZ.F. ]]
         [types.Opcode.JMN] = function()
             local next_pc = (task.pc + 1) % #self.core
-            if utils.every(b_lens:get(), function(v) return v ~= 0 end) then
+            if tables.every(b_lens:get(), function(v) return v ~= 0 end) then
                 next_pc = a_operand.read_pc
             end
             return { next_pc = next_pc }
@@ -312,7 +296,7 @@ function Mars:execute_warrior_insn(warrior)
         [types.Opcode.DJN] = function()
             local next_pc = (task.pc + 1) % #self.core
             local xs = b_lens:update(function(x) return x - 1 end)
-            if utils.every(xs, function(v) return v ~= 0 end) then
+            if tables.every(xs, function(v) return v ~= 0 end) then
                 next_pc = a_operand.read_pc
             end
             return { next_pc = next_pc }
@@ -334,8 +318,8 @@ function Mars:execute_warrior_insn(warrior)
                     and a_operand.insn.b_mode == b_operand.insn.b_mode
                     and a_operand.insn.b_number == b_operand.insn.b_number
             else
-                local pairs = utils.zip(a_lens:get(), b_lens:get())
-                cond = utils.every(pairs, function(p) return p[1] == p[2] end)
+                local pairs = tables.zip(a_lens:get(), b_lens:get())
+                cond = tables.every(pairs, function(p) return p[1] == p[2] end)
             end
             if cond then
                 offset = offset + 1
@@ -350,8 +334,8 @@ function Mars:execute_warrior_insn(warrior)
         instruction is queued (PC + 1).  SLT.I functions as SLT.F would.]]
         [types.Opcode.SLT] = function()
             local offset = 1
-            local pairs = utils.zip(a_lens:get(), b_lens:get())
-            if utils.every(pairs, function(p) return p[1] < p[2] end) then
+            local pairs = tables.zip(a_lens:get(), b_lens:get())
+            if tables.every(pairs, function(p) return p[1] < p[2] end) then
                 offset = offset + 1
             end
             return { next_pc = (task.pc + offset) % #self.core }
@@ -374,10 +358,23 @@ function Mars:execute_warrior_insn(warrior)
         error(string.format("unknown opcode %s at PC=%d", insn.opcode, task.pc))
     end
 
-    -- TODO: Implement 'warrior.opcode' hook here
+    self:process_hook("warrior.step", {
+        cycle = self.cycles,
+        warrior = warrior,
+        pc = task.pc,
+        insn = insn,
+        a_operand = a_operand,
+        b_operand = b_operand
+    })
     local update = handler()
 
-    -- TODO: Implement 'warrior.task_update' hook here
+    self:process_hook("warrior.task_update", {
+        cycle = self.cycles,
+        warrior = warrior,
+        pc = task.pc,
+        insn = insn,
+        task_update = update
+    })
     if update.next_pc ~= nil then
         warrior.tasks:pushright({ id = task.id, pc = update.next_pc })
     end
@@ -389,7 +386,12 @@ function Mars:execute_warrior_insn(warrior)
     end
 
     if warrior.tasks:length() == 0 then
-        -- TODO: Implement 'warrior.died' hook here
+        self:process_hook("warrior.died", {
+            cycle = self.cycles,
+            warrior = warrior,
+            pc = task.pc,
+            insn = insn
+        })
         self.warriors_by_id[warrior.id] = nil
     end
 end
@@ -445,7 +447,6 @@ function Mars:compute_operand(pc, operand)
     local insn = self:fetch(pc)
     local mode = (operand == "A" and insn.a_mode) or insn.b_mode
     local value = (operand == "A" and insn.a_number) or insn.b_number
-    -- print(string.format("operand=>%s, mode=>%s, value=>%d", operand, mode, value))
 
     if mode ~= types.Mode.Immediate then
         read_pc = clamp(#self.core, read_distance, read_pc, value)
@@ -477,6 +478,47 @@ function Mars:compute_operand(pc, operand)
         read_pc = read_pc,
         write_pc = write_pc
     }
+end
+
+---Register hook for `events` before all other hooks
+---@param events string[]
+---@param hook Hook
+function Mars:install_front(events, hook)
+    for _, event in ipairs(events) do
+        self.hooks[event] = self.hooks[event] or Queue:new()
+        self.hooks[event]:pushleft(hook)
+    end
+end
+
+---Register hook for `events` after all other hooks
+---@param events string[]
+---@param hook Hook
+function Mars:install_back(events, hook)
+    for _, event in ipairs(events) do
+        self.hooks[event] = self.hooks[event] or Queue:new()
+        self.hooks[event]:pushright(hook)
+    end
+end
+
+---Calls all hooks for `event` in order
+---@param event string
+---@param data any
+function Mars:process_hook(event, data)
+    local hooks = self.hooks[event]
+    if hooks == nil then
+        return
+    end
+    for hook in hooks:items() do
+        local action = hook(event, data)
+        if action == types.HookAction.PAUSE then
+            if not coroutine.running() then
+                error("tried to pause but not in coroutine")
+            end
+            coroutine.yield()
+        elseif action ~= types.HookAction.RESUME then
+            error(string.format("unknown hook action '%s'", event))
+        end
+    end
 end
 
 return Mars

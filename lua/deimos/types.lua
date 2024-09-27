@@ -89,7 +89,15 @@ end
 ---@alias WarriorTaskUpdate { next_pc?: integer, new_pc?: integer }
 ---@alias Warrior { id: string, tasks: Queue, next_task_id: integer, program: WarriorProgram }
 
+---@enum HookAction
+local HookAction = {
+    PAUSE = "PAUSE",
+    RESUME = "RESUME",
+}
+---@alias Hook fun(event: string, data: any): HookAction
+
 return {
+    HookAction = HookAction,
     is_mode_char = is_mode_char,
     MatchStatus = MatchStatus,
     Mode = Mode,

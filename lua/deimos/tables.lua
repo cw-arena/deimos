@@ -1,3 +1,14 @@
+---Make a copy of a table
+---@param table table The table to copy
+---@return table copy A shallow copy of the table
+local function clone(table)
+    local copy = {}
+    for k, v in pairs(table) do
+        copy[k] = v
+    end
+    return copy
+end
+
 ---comment Check every table item against a predicate
 ---@generic T
 ---@param xs T[] Table to iterate over
@@ -28,6 +39,7 @@ local function zip(xs, ys)
 end
 
 return {
+    clone = clone,
     every = every,
     zip = zip
 }
