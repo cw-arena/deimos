@@ -10,6 +10,19 @@ local Mode = {
     PostIncrementB = ">",
 }
 
+---@type table<string, Mode>
+local ModesByChar = {}
+for mode, c in pairs(Mode) do
+    ModesByChar[c] = mode
+end
+
+---Check if a character is a valid mode
+---@param c string Character to check
+---@return boolean
+local function is_mode_char(c)
+    return ModesByChar[c] ~= nil
+end
+
 ---@enum Modifier
 local Modifier = {
     AB = "AB",
@@ -52,7 +65,8 @@ local MatchStatus = {
     TIE = "TIE",
 }
 
----@alias Insn { opcode: Opcode, modifier: Modifier, aMode: Mode, aNumber: integer, bMode: Mode, bNumber: integer }
+---@alias Insn { opcode: Opcode, modifier: Modifier, a_mode: Mode, a_number: integer, b_mode: Mode, b_number: integer }
+---@alias OrgInsn { org: integer }
 
 ---Pretty-print instruction into string
 ---@param insn Insn # Instruction to format
@@ -62,20 +76,21 @@ local function formatInsn(insn)
         "%s.%s %s%d, %s%d",
         insn.opcode,
         insn.modifier,
-        insn.aMode,
-        insn.aNumber,
-        insn.bMode,
-        insn.bNumber
+        insn.a_mode,
+        insn.a_number,
+        insn.b_mode,
+        insn.b_number
     )
 end
 
 ---@alias WarriorMetadata { name?: string, author?: string, strategy?: string }
----@alias WarriorProgram { metadata: WarriorMetadata, insns: Insn[] }
+---@alias WarriorProgram { metadata: WarriorMetadata, insns: (Insn | OrgInsn)[] }
 ---@alias WarriorTask { id: number, pc: integer }
 ---@alias WarriorTaskUpdate { next_pc?: integer, new_pc?: integer }
 ---@alias Warrior { id: string, tasks: TaskQueue, next_task_id: integer, program: WarriorProgram }
 
 return {
+    is_mode_char = is_mode_char,
     MatchStatus = MatchStatus,
     Mode = Mode,
     Modifier = Modifier,

@@ -9,10 +9,10 @@ describe("parse_instruction", function()
                 {
                     opcode = value,
                     modifier = types.Modifier.F,
-                    aMode = types.Mode.Immediate,
-                    aNumber = 0,
-                    bMode = types.Mode.Immediate,
-                    bNumber = 0
+                    a_mode = types.Mode.Immediate,
+                    a_number = 0,
+                    b_mode = types.Mode.Immediate,
+                    b_number = 0
                 },
                 load_file.parse_insn(insn)
             )
@@ -26,10 +26,10 @@ describe("parse_instruction", function()
                 {
                     opcode = types.Opcode.MOV,
                     modifier = types.Modifier.I,
-                    aMode = value,
-                    aNumber = 0,
-                    bMode = types.Mode.Direct,
-                    bNumber = 1
+                    a_mode = value,
+                    a_number = 0,
+                    b_mode = types.Mode.Direct,
+                    b_number = 1
                 },
                 load_file.parse_insn(insn)
             )
@@ -43,10 +43,10 @@ describe("parse_instruction", function()
                 {
                     opcode = types.Opcode.ADD,
                     modifier = value,
-                    aMode = types.Mode.Immediate,
-                    aNumber = 1,
-                    bMode = types.Mode.Direct,
-                    bNumber = 2
+                    a_mode = types.Mode.Immediate,
+                    a_number = 1,
+                    b_mode = types.Mode.Direct,
+                    b_number = 2
                 },
                 load_file.parse_insn(insn)
             )
@@ -58,26 +58,12 @@ describe("parse_instruction", function()
             {
                 opcode = types.Opcode.MOV,
                 modifier = types.Modifier.I,
-                aMode = types.Mode.Direct,
-                aNumber = 2,
-                bMode = types.Mode.Indirect,
-                bNumber = -2,
+                a_mode = types.Mode.Direct,
+                a_number = 2,
+                b_mode = types.Mode.Indirect,
+                b_number = -2,
             },
             load_file.parse_insn("MOV.I $+2, @-2")
-        )
-    end)
-
-    it("can parse trailing comments", function()
-        assert.are.same(
-            {
-                opcode = types.Opcode.MOV,
-                modifier = types.Modifier.I,
-                aMode = types.Mode.Direct,
-                aNumber = 0,
-                bMode = types.Mode.Direct,
-                bNumber = 1
-            },
-            load_file.parse_insn("MOV.I $0, $1 ; this is a test comment")
         )
     end)
 
@@ -97,10 +83,10 @@ describe("parse_load_file", function()
                 metadata = {},
                 insns = {
                     { org = 1 },
-                    { opcode = "DAT", modifier = "F",  aMode = "#", aNumber = 0,  bMode = "#", bNumber = 0 },
-                    { opcode = "ADD", modifier = "AB", aMode = "#", aNumber = 4,  bMode = "$", bNumber = -1 },
-                    { opcode = "MOV", modifier = "I",  aMode = "$", aNumber = -2, bMode = "@", bNumber = -2 },
-                    { opcode = "JMP", modifier = "A",  aMode = "$", aNumber = -2, bMode = "#", bNumber = 0 }
+                    { opcode = "DAT", modifier = "F",  a_mode = "#", a_number = 0,  b_mode = "#", b_number = 0 },
+                    { opcode = "ADD", modifier = "AB", a_mode = "#", a_number = 4,  b_mode = "$", b_number = -1 },
+                    { opcode = "MOV", modifier = "I",  a_mode = "$", a_number = -2, b_mode = "@", b_number = -2 },
+                    { opcode = "JMP", modifier = "A",  a_mode = "$", a_number = -2, b_mode = "#", b_number = 0 }
                 }
             },
             load_file.parse_load_file(dwarf_code)

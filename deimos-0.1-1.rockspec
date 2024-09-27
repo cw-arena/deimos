@@ -16,8 +16,7 @@ description = {
    license = "MIT"
 }
 dependencies = {
-   "lua >= 5.1",
-   "lpeg ~> 1.1.0-2"
+   "lua >= 5.1"
 }
 build = {
    type = "builtin"

@@ -329,10 +329,10 @@ function Mars:execute_warrior_insn(warrior)
             if insn.modifier == types.Modifier.I then
                 cond = a_operand.insn.opcode == b_operand.insn.opcode
                     and a_operand.insn.modifier == b_operand.insn.modifier
-                    and a_operand.insn.aMode == b_operand.insn.aMode
-                    and a_operand.insn.aNumber == b_operand.insn.aNumber
-                    and a_operand.insn.bMode == b_operand.insn.bMode
-                    and a_operand.insn.bNumber == b_operand.insn.bNumber
+                    and a_operand.insn.a_mode == b_operand.insn.a_mode
+                    and a_operand.insn.a_number == b_operand.insn.a_number
+                    and a_operand.insn.b_mode == b_operand.insn.b_mode
+                    and a_operand.insn.b_number == b_operand.insn.b_number
             else
                 local pairs = utils.zip(a_lens:get(), b_lens:get())
                 cond = utils.every(pairs, function(p) return p[1] == p[2] end)
@@ -443,8 +443,8 @@ function Mars:compute_operand(pc, operand)
     local post_inc_pc = nil
 
     local insn = self:fetch(pc)
-    local mode = (operand == "A" and insn.aMode) or insn.bMode
-    local value = (operand == "A" and insn.aNumber) or insn.bNumber
+    local mode = (operand == "A" and insn.a_mode) or insn.b_mode
+    local value = (operand == "A" and insn.a_number) or insn.b_number
     -- print(string.format("operand=>%s, mode=>%s, value=>%d", operand, mode, value))
 
     if mode ~= types.Mode.Immediate then
@@ -455,21 +455,21 @@ function Mars:compute_operand(pc, operand)
             -- TODO: Add support for PreDecrementA
             if mode == types.Mode.PreDecrementB then
                 local predec_insn = self:fetch(write_pc)
-                predec_insn.bNumber = (predec_insn.bNumber + #self.core - 1) % #self.core
+                predec_insn.b_number = (predec_insn.b_number + #self.core - 1) % #self.core
                 -- TODO: Add support for PostIncrementA
             elseif mode == types.Mode.PostIncrementB then
                 post_inc_pc = write_pc
             end
 
-            read_pc = clamp(#self.core, read_distance, read_pc, self:fetch(read_pc).bNumber)
-            write_pc = clamp(#self.core, write_distance, write_pc, self:fetch(write_pc).bNumber)
+            read_pc = clamp(#self.core, read_distance, read_pc, self:fetch(read_pc).b_number)
+            write_pc = clamp(#self.core, write_distance, write_pc, self:fetch(write_pc).b_number)
         end
     end
 
     -- TODO: Add support for PostIncrementA
     if post_inc_pc ~= nil then
         local post_inc_insn = self:fetch(post_inc_pc)
-        post_inc_insn.bNumber = post_inc_insn.bNumber + 1
+        post_inc_insn.b_number = post_inc_insn.b_number + 1
     end
 
     return {

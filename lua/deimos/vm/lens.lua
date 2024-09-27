@@ -50,10 +50,10 @@ end
 local function a(insn)
     return Lens:new(
         function()
-            return { insn.aNumber }
+            return { insn.a_number }
         end,
         function(xs)
-            insn.aNumber = xs[1]
+            insn.a_number = xs[1]
         end
     )
 end
@@ -64,10 +64,10 @@ end
 local function b(insn)
     return Lens:new(
         function()
-            return { insn.bNumber }
+            return { insn.b_number }
         end,
         function(xs)
-            insn.bNumber = xs[1]
+            insn.b_number = xs[1]
         end
     )
 end
@@ -78,11 +78,11 @@ end
 local function ab(insn)
     return Lens:new(
         function()
-            return { insn.aNumber, insn.bNumber }
+            return { insn.a_number, insn.b_number }
         end,
         function(xs)
-            insn.aNumber = xs[1]
-            insn.bNumber = xs[2]
+            insn.a_number = xs[1]
+            insn.b_number = xs[2]
         end
     )
 end
@@ -93,11 +93,11 @@ end
 local function ba(insn)
     return Lens:new(
         function()
-            return { insn.bNumber, insn.aNumber }
+            return { insn.b_number, insn.a_number }
         end,
         function(xs)
-            insn.bNumber = xs[1]
-            insn.aNumber = xs[2]
+            insn.b_number = xs[1]
+            insn.a_number = xs[2]
         end
     )
 end
