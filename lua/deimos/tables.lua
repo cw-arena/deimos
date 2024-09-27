@@ -38,8 +38,27 @@ local function zip(xs, ys)
     return tbl
 end
 
+---Format a value into a string representation
+---@param x any
+---@return unknown
+local function dump(x)
+    if type(x) ~= "table" then
+        return tostring(x)
+    end
+
+    local s = ""
+    for k, v in pairs(x) do
+        if type(k) ~= "number" then
+            k = string.format('"%s"', k)
+        end
+        s = s .. string.format("[%s] = %s,", k, dump(v))
+    end
+    return string.format("{ %s }", s)
+end
+
 return {
     clone = clone,
+    dump = dump,
     every = every,
     zip = zip
 }

@@ -152,7 +152,7 @@ function Mars:execute_warrior_insn(warrior)
     local task = warrior.tasks:popleft() --[[@as WarriorTask]]
     local insn = self:fetch(task.pc)
 
-    self:process_hook("warrior.step", {
+    self:process_hook("warrior.begin", {
         cycle = self.cycles,
         warrior = warrior,
         pc = task.pc,
@@ -358,7 +358,7 @@ function Mars:execute_warrior_insn(warrior)
         error(string.format("unknown opcode %s at PC=%d", insn.opcode, task.pc))
     end
 
-    self:process_hook("warrior.step", {
+    self:process_hook("warrior.insn", {
         cycle = self.cycles,
         warrior = warrior,
         pc = task.pc,

@@ -1,6 +1,7 @@
 local Mars = require "deimos.vm.mars"
 local parser = require "deimos.parser"
 local types = require "deimos.types"
+local tables = require "deimos.tables"
 
 describe("Mars", function()
     describe("compute_operand", function()
@@ -168,5 +169,90 @@ describe("Mars", function()
 
         vm:execute_cycle()
         assert.are.same({ id = 0, pc = 1 }, warrior.tasks:peek())
+    end)
+
+    it("emits events when executing warrior", function()
+        local dwarf_file = assert(io.open("./warriors/dwarf.red", "r"))
+        local dwarf_code = dwarf_file:read("*a")
+        dwarf_file:close()
+
+        local program = parser.parse_load_file(dwarf_code)
+        assert.is_not_nil(program)
+
+        local events = { "warrior.begin", "warrior.insn", "warrior.task_update" }
+        local called_events = {}
+
+        local vm = Mars:new()
+        vm:initialize({ program })
+        vm:install_back(events, function(event, data)
+            local cycle = 0
+            local warrior = vm.warriors_by_id["1"]
+            local pc = 1
+            local insn = parser.parse_insn("ADD.AB #4, $-1")
+            local a_operand = {
+                insn = insn,
+                read_pc = 1,
+                write_pc = 1
+            }
+            local b_operand = {
+                insn = parser.parse_insn("DAT.F #0, #0"),
+                read_pc = 0,
+                write_pc = 0,
+            }
+
+            if event == "warrior.begin" then
+                assert.are.same(
+                    {
+                        cycle = cycle,
+                        warrior = warrior,
+                        pc = pc,
+                        insn = insn,
+                    },
+                    data
+                )
+            elseif event == "warrior.insn" then
+                assert.are.same(
+                    {
+                        cycle = cycle,
+                        warrior = warrior,
+                        pc = pc,
+                        insn = insn,
+                        a_operand = a_operand,
+                        b_operand = b_operand,
+                    },
+                    data
+                )
+            elseif event == "warrior.task_update" then
+                assert.are.same(
+                    {
+                        cycle = cycle,
+                        warrior = warrior,
+                        pc = pc,
+                        insn = insn,
+                        task_update = { next_pc = 2 }
+                    },
+                    data
+                )
+            end
+            assert.is_nil(called_events[event])
+            called_events[event] = event
+            return types.HookAction.RESUME
+        end)
+
+        vm:execute_cycle()
+
+        -- NB: Ensure every requested event was received
+        for _, event in ipairs(events) do
+            assert.is.equal(event, called_events[event])
+        end
+
+        -- NB: Ensure every received event was requested
+        for _, called_event in pairs(called_events) do
+            local found = false
+            for _, event in ipairs(events) do
+                found = found or called_event == event
+            end
+            assert.is.is_true(found)
+        end
     end)
 end)
