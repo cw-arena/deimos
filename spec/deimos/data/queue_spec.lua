@@ -44,4 +44,18 @@ describe("Queue", function()
             end
         end)
     end)
+
+    describe("Queue:items", function()
+        it("produces every item in left-to-right order", function()
+            local queue = Queue:new()
+            for i = 1, 10 do
+                queue:pushright(i)
+            end
+            local i = 1
+            for item in queue:items() do
+                assert.is.equal(i, item)
+                i = i + 1
+            end
+        end)
+    end)
 end)

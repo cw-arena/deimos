@@ -84,4 +84,17 @@ function Queue:peek()
     return self[self.first]
 end
 
+---Create iterator over queue items in left-to-right order
+---@return fun(): any # Iterator function
+function Queue:items()
+    local i = self.first - 1
+    local last = self.last
+    return function()
+        i = i + 1
+        if i <= last then
+            return self[i]
+        end
+    end
+end
+
 return Queue
