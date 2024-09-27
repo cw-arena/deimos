@@ -1,6 +1,6 @@
-local load_file         = require "deimos.parser.load_file"
+local Queue             = require "deimos.data.queue"
+local parser            = require "deimos.parser"
 local types             = require "deimos.types"
-local TaskQueue         = require "deimos.vm.task_queue"
 local lens              = require "deimos.vm.lens"
 local utils             = require "deimos.utils"
 
@@ -8,7 +8,7 @@ local DEFAULT_CORE_SIZE = 8000
 
 ---Instruction used to initialize core
 ---@type Insn
-local INITIAL_INSN      = load_file.parse_insn("DAT.F #0, #0") --[[@as Insn]]
+local INITIAL_INSN      = parser.parse_insn("DAT.F #0, #0") --[[@as Insn]]
 
 ---Make a copy of a table
 ---@param table table The table to copy
@@ -87,7 +87,7 @@ function Mars:initialize(programs)
 
         self.warriors_by_id[tostring(id)] = {
             id = tostring(id),
-            tasks = TaskQueue:new({ id = 0, pc = pc + org }),
+            tasks = Queue:new({ id = 0, pc = pc + org }),
             next_task_id = 1,
             program = program,
         }
@@ -158,7 +158,7 @@ local BINOPS = {
 ---Execute a single instruction from a warrior
 ---@param warrior Warrior Warrior to execute instruction from
 function Mars:execute_warrior_insn(warrior)
-    local task = warrior.tasks:dequeue() --[[@as WarriorTask]]
+    local task = warrior.tasks:popleft() --[[@as WarriorTask]]
     -- print("")
     -- print(string.format("task: id=>%d, pc=%d", task.id, task.pc))
 
@@ -379,12 +379,12 @@ function Mars:execute_warrior_insn(warrior)
 
     -- TODO: Implement 'warrior.task_update' hook here
     if update.next_pc ~= nil then
-        warrior.tasks:enqueue({ id = task.id, pc = update.next_pc })
+        warrior.tasks:pushright({ id = task.id, pc = update.next_pc })
     end
 
     if update.new_pc ~= nil then
         local task_id = warrior.next_task_id
-        warrior.tasks:enqueue({ id = task_id, pc = update.new_pc })
+        warrior.tasks:pushright({ id = task_id, pc = update.new_pc })
         warrior.next_task_id = task_id + 1
     end
 

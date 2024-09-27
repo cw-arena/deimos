@@ -87,7 +87,7 @@ end
 ---@alias WarriorProgram { metadata: WarriorMetadata, insns: (Insn | OrgInsn)[] }
 ---@alias WarriorTask { id: number, pc: integer }
 ---@alias WarriorTaskUpdate { next_pc?: integer, new_pc?: integer }
----@alias Warrior { id: string, tasks: TaskQueue, next_task_id: integer, program: WarriorProgram }
+---@alias Warrior { id: string, tasks: Queue, next_task_id: integer, program: WarriorProgram }
 
 return {
     is_mode_char = is_mode_char,
