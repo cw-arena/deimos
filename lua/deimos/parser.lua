@@ -1,4 +1,4 @@
-local insn = require "deimos.data.insn"
+local Insn = require "deimos.data.insn"
 
 local opcode_pat = "(%a%a%a)[ \t]*"
 local modifier_pat = "(%a%a?)[ \t]*"
@@ -26,16 +26,16 @@ local function parse_insn(input)
         string.match(input, insn_pat)
     if opcode == nil then
         return nil
-    elseif insn.Opcode[opcode:upper()] == nil then
+    elseif Insn.Opcode[opcode:upper()] == nil then
         return nil
-    elseif insn.Modifier[modifier:upper()] == nil then
+    elseif Insn.Modifier[modifier:upper()] == nil then
         return nil
-    elseif not insn.is_mode_char(a_mode) then
+    elseif not Insn.is_mode_char(a_mode) then
         return nil
-    elseif not insn.is_mode_char(b_mode) then
+    elseif not Insn.is_mode_char(b_mode) then
         return nil
     end
-    return insn.Insn:new({
+    return Insn:new({
         opcode = opcode:upper(),
         modifier = modifier:upper(),
         a_mode = a_mode,

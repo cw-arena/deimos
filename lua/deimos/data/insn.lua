@@ -65,7 +65,12 @@ local Opcode = {
 ---@field a_number integer
 ---@field b_mode Mode
 ---@field b_number integer
-local Insn = {}
+local Insn = {
+    Mode = Mode,
+    Modifier = Modifier,
+    Opcode = Opcode,
+    is_mode_char = is_mode_char
+}
 
 function Insn:new(fields)
     local o = {
@@ -96,14 +101,4 @@ function Insn:format()
     )
 end
 
----@alias OrgInsn { org: integer }
-
----@alias ProgramInsn OrgInsn | Insn
-
-return {
-    Opcode = Opcode,
-    Modifier = Modifier,
-    Mode = Mode,
-    is_mode_char = is_mode_char,
-    Insn = Insn
-}
+return Insn

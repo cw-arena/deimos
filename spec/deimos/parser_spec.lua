@@ -1,17 +1,17 @@
-local insn   = require "deimos.data.insn"
+local Insn   = require "deimos.data.insn"
 local parser = require "deimos.parser"
 
 describe("parse_instruction", function()
     it("can parse all opcodes", function()
-        for _, value in pairs(insn.Opcode) do
+        for _, value in pairs(Insn.Opcode) do
             local source = string.format("%s.F #0, #0", value)
             assert.are.same(
                 {
                     opcode = value,
-                    modifier = insn.Modifier.F,
-                    a_mode = insn.Mode.Immediate,
+                    modifier = Insn.Modifier.F,
+                    a_mode = Insn.Mode.Immediate,
                     a_number = 0,
-                    b_mode = insn.Mode.Immediate,
+                    b_mode = Insn.Mode.Immediate,
                     b_number = 0
                 },
                 parser.parse_insn(source)
@@ -20,15 +20,15 @@ describe("parse_instruction", function()
     end)
 
     it("can parse all modes", function()
-        for _, value in pairs(insn.Mode) do
+        for _, value in pairs(Insn.Mode) do
             local source = string.format("MOV.I %s0, $1", value)
             assert.are.same(
                 {
-                    opcode = insn.Opcode.MOV,
-                    modifier = insn.Modifier.I,
+                    opcode = Insn.Opcode.MOV,
+                    modifier = Insn.Modifier.I,
                     a_mode = value,
                     a_number = 0,
-                    b_mode = insn.Mode.Direct,
+                    b_mode = Insn.Mode.Direct,
                     b_number = 1
                 },
                 parser.parse_insn(source)
@@ -37,15 +37,15 @@ describe("parse_instruction", function()
     end)
 
     it("can parse all modifiers", function()
-        for _, value in pairs(insn.Modifier) do
+        for _, value in pairs(Insn.Modifier) do
             local source = string.format("ADD.%s #1, $2", value)
             assert.are.same(
                 {
-                    opcode = insn.Opcode.ADD,
+                    opcode = Insn.Opcode.ADD,
                     modifier = value,
-                    a_mode = insn.Mode.Immediate,
+                    a_mode = Insn.Mode.Immediate,
                     a_number = 1,
-                    b_mode = insn.Mode.Direct,
+                    b_mode = Insn.Mode.Direct,
                     b_number = 2
                 },
                 parser.parse_insn(source)
@@ -56,11 +56,11 @@ describe("parse_instruction", function()
     it("can parse signed operands", function()
         assert.are.same(
             {
-                opcode = insn.Opcode.MOV,
-                modifier = insn.Modifier.I,
-                a_mode = insn.Mode.Direct,
+                opcode = Insn.Opcode.MOV,
+                modifier = Insn.Modifier.I,
+                a_mode = Insn.Mode.Direct,
                 a_number = 2,
-                b_mode = insn.Mode.Indirect,
+                b_mode = Insn.Mode.Indirect,
                 b_number = -2,
             },
             parser.parse_insn("MOV.I $+2, @-2")

@@ -1,6 +1,5 @@
 local Mars = require "deimos.mars"
 local parser = require "deimos.parser"
-local types = require "deimos.types"
 
 local function create_test_mars(...)
     local programs = {}
@@ -229,7 +228,7 @@ describe("Mars", function()
                 end
                 assert.is_nil(called_events[event])
                 called_events[event] = event
-                return types.HookAction.RESUME
+                return Mars.HookAction.RESUME
             end)
 
             vm:execute_cycle()
@@ -255,7 +254,7 @@ describe("Mars", function()
             for i = 1, 5 do
                 vm:install_back({ "warrior.begin" }, function()
                     table.insert(calls, i)
-                    return types.HookAction.RESUME
+                    return Mars.HookAction.RESUME
                 end)
             end
             vm:execute_cycle()
@@ -265,7 +264,7 @@ describe("Mars", function()
         it("returns control when hook pauses execution", function()
             local vm = create_test_mars("MOV.I $0, $1")
             vm:install_back({ "warrior.begin" }, function()
-                return types.HookAction.PAUSE
+                return Mars.HookAction.PAUSE
             end)
 
             local co = coroutine.create(function()
@@ -290,7 +289,7 @@ describe("Mars", function()
                     warrior = vm.warriors_by_id["1"],
                     insn = parser.parse_insn("DAT.F #0, #0"),
                 }, data)
-                return types.HookAction.RESUME
+                return Mars.HookAction.RESUME
             end)
             vm:execute_cycle()
             assert.is_true(called)

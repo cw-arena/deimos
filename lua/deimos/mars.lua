@@ -1,4 +1,4 @@
-local insn              = require "deimos.data.insn"
+local Insn              = require "deimos.data.insn"
 local Lens              = require "deimos.data.lens"
 local Queue             = require "deimos.data.queue"
 local parser            = require "deimos.parser"
@@ -28,6 +28,9 @@ local HookAction        = {
 
 ---@alias Hook fun(event: string, data: any): HookAction
 
+---@alias OrgInsn { org: integer }
+---@alias ProgramInsn OrgInsn | Insn
+
 ---@alias WarriorMetadata { name?: string, author?: string, strategy?: string }
 ---@alias WarriorProgram { metadata: WarriorMetadata, insns: ProgramInsn[] }
 ---@alias WarriorTask { id: number, pc: integer }
@@ -42,7 +45,9 @@ local HookAction        = {
 ---@field cycles integer
 ---@field warriors_by_id table<string, Warrior>
 ---@field private hooks table<string, Queue>
-local Mars              = {}
+local Mars              = {
+    HookAction = HookAction,
+}
 
 ---Create a new [Mars](lua://Mars)
 ---@param options? MarsOptions
@@ -81,7 +86,7 @@ function Mars:initialize(programs)
 
     self.core = {}
     for _ = 1, core_size do
-        table.insert(self.core, insn.Insn:new(initial_insn))
+        table.insert(self.core, Insn:new(initial_insn))
     end
 
     self.cycles = 0
@@ -95,7 +100,7 @@ function Mars:initialize(programs)
             if program_insn["org"] ~= nil then
                 org = program_insn["org"]
             else
-                self.core[pc + j] = insn.Insn:new(program_insn)
+                self.core[pc + j] = Insn:new(program_insn)
                 j = j + 1
             end
         end
@@ -153,16 +158,16 @@ end
 
 ---@type table<Opcode, fun(x: integer, y: integer): integer?>
 local BINOPS = {
-    [insn.Opcode.ADD] = function(x, y) return x + y end,
-    [insn.Opcode.SUB] = function(x, y) return x + y end,
-    [insn.Opcode.MUL] = function(x, y) return x + y end,
-    [insn.Opcode.DIV] = function(x, y)
+    [Insn.Opcode.ADD] = function(x, y) return x + y end,
+    [Insn.Opcode.SUB] = function(x, y) return x + y end,
+    [Insn.Opcode.MUL] = function(x, y) return x + y end,
+    [Insn.Opcode.DIV] = function(x, y)
         if y == 0 then
             return nil
         end
         return math.floor(x / y)
     end,
-    [insn.Opcode.MOD] = function(x, y)
+    [Insn.Opcode.MOD] = function(x, y)
         if y == 0 then
             return nil
         end
@@ -174,21 +179,21 @@ local BINOPS = {
 ---@param warrior Warrior Warrior to execute instruction from
 function Mars:execute_warrior_insn(warrior)
     local task = warrior.tasks:popleft() --[[@as WarriorTask]]
-    local pc_insn = self:fetch(task.pc)
+    local insn = self:fetch(task.pc)
 
     self:process_hook("warrior.begin", {
         cycle = self.cycles,
         warrior = warrior,
         pc = task.pc,
-        insn = pc_insn
+        insn = insn
     })
 
     local a_operand = self:compute_operand(task.pc, "A")
     local b_operand = self:compute_operand(task.pc, "B")
 
-    local a_lens, b_lens = Lens.get_modifier_lenses(pc_insn.modifier, a_operand.insn, b_operand.insn)
+    local a_lens, b_lens = Lens.get_modifier_lenses(insn.modifier, a_operand.insn, b_operand.insn)
     if a_lens == nil or b_lens == nil then
-        error(string.format("unknown modifier %s at PC=%d", pc_insn.modifier, task.pc))
+        error(string.format("unknown modifier %s at PC=%d", insn.modifier, task.pc))
     end
 
     ---Generate an opcode handler for an arithmetic operation
@@ -374,16 +379,16 @@ function Mars:execute_warrior_insn(warrior)
         end
     }
 
-    local handler = opcode_handlers[pc_insn.opcode]
+    local handler = opcode_handlers[insn.opcode]
     if handler == nil then
-        error(string.format("unknown opcode %s at PC=%d", pc_insn.opcode, task.pc))
+        error(string.format("unknown opcode %s at PC=%d", insn.opcode, task.pc))
     end
 
     self:process_hook("warrior.insn", {
         cycle = self.cycles,
         warrior = warrior,
         pc = task.pc,
-        insn = pc_insn,
+        insn = insn,
         a_operand = a_operand,
         b_operand = b_operand
     })
@@ -393,7 +398,7 @@ function Mars:execute_warrior_insn(warrior)
         cycle = self.cycles,
         warrior = warrior,
         pc = task.pc,
-        insn = pc_insn,
+        insn = insn,
         task_update = update
     })
     if update.next_pc ~= nil then
@@ -411,7 +416,7 @@ function Mars:execute_warrior_insn(warrior)
             cycle = self.cycles,
             warrior = warrior,
             pc = task.pc,
-            insn = pc_insn
+            insn = insn
         })
         self.warriors_by_id[warrior.id] = nil
     end
@@ -465,21 +470,21 @@ function Mars:compute_operand(pc, operand)
     ---@type nil | integer
     local post_inc_pc = nil
 
-    local pc_insn = self:fetch(pc)
-    local mode = (operand == "A" and pc_insn.a_mode) or pc_insn.b_mode
-    local value = (operand == "A" and pc_insn.a_number) or pc_insn.b_number
+    local insn = self:fetch(pc)
+    local mode = (operand == "A" and insn.a_mode) or insn.b_mode
+    local value = (operand == "A" and insn.a_number) or insn.b_number
 
-    if mode ~= insn.Mode.Immediate then
+    if mode ~= Insn.Mode.Immediate then
         read_pc = clamp(#self.core, read_distance, read_pc, value)
         write_pc = clamp(#self.core, write_distance, write_pc, value)
 
-        if mode ~= insn.Mode.Direct then
+        if mode ~= Insn.Mode.Direct then
             -- TODO: Add support for PreDecrementA
-            if mode == insn.Mode.PreDecrementB then
+            if mode == Insn.Mode.PreDecrementB then
                 local predec_insn = self:fetch(write_pc)
                 predec_insn.b_number = (predec_insn.b_number + #self.core - 1) % #self.core
                 -- TODO: Add support for PostIncrementA
-            elseif mode == insn.Mode.PostIncrementB then
+            elseif mode == Insn.Mode.PostIncrementB then
                 post_inc_pc = write_pc
             end
 
