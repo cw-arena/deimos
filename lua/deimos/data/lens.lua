@@ -1,4 +1,4 @@
-local types = require "deimos.types"
+local insn = require "deimos.data.insn"
 
 ---@class Lens
 ---@field private _get fun(): integer[]
@@ -105,13 +105,13 @@ end
 ---@alias LensFactory fun(insn: Insn): Lens
 ---@type table<Modifier, [LensFactory, LensFactory]>
 local MODIFIER_LENS_FACTORIES = {
-    [types.Modifier.A] = { a, a },
-    [types.Modifier.B] = { b, b },
-    [types.Modifier.AB] = { a, b },
-    [types.Modifier.BA] = { b, a },
-    [types.Modifier.F] = { ab, ab },
-    [types.Modifier.I] = { ab, ab },
-    [types.Modifier.X] = { ab, ba },
+    [insn.Modifier.A] = { a, a },
+    [insn.Modifier.B] = { b, b },
+    [insn.Modifier.AB] = { a, b },
+    [insn.Modifier.BA] = { b, a },
+    [insn.Modifier.F] = { ab, ab },
+    [insn.Modifier.I] = { ab, ab },
+    [insn.Modifier.X] = { ab, ba },
 }
 
 ---Get the lenses for an instruction modifier

@@ -1,4 +1,4 @@
-local types = require "deimos.types"
+local insn = require "deimos.data.insn"
 
 local opcode_pat = "(%a%a%a)[ \t]*"
 local modifier_pat = "(%a%a?)[ \t]*"
@@ -26,35 +26,36 @@ local function parse_insn(input)
         string.match(input, insn_pat)
     if opcode == nil then
         return nil
-    elseif types.Opcode[opcode:upper()] == nil then
+    elseif insn.Opcode[opcode:upper()] == nil then
         return nil
-    elseif types.Modifier[modifier:upper()] == nil then
+    elseif insn.Modifier[modifier:upper()] == nil then
         return nil
-    elseif not types.is_mode_char(a_mode) then
+    elseif not insn.is_mode_char(a_mode) then
         return nil
-    elseif not types.is_mode_char(b_mode) then
+    elseif not insn.is_mode_char(b_mode) then
         return nil
     end
-    return {
+    return insn.Insn:new({
         opcode = opcode:upper(),
         modifier = modifier:upper(),
         a_mode = a_mode,
         a_number = tonumber(a_number),
         b_mode = b_mode,
         b_number = tonumber(b_number)
-    }
+    })
 end
 
 ---Parse a single ORG pseudo-instruction
 ---@param input string Source code for ORG instruction
 ---@return OrgInsn | nil # Parsed ORG instruction, or nil if parse failed
 local function parse_org_insn(input)
-    local insn = nil
+    ---@type OrgInsn | nil
+    local org_insn = nil
     local org = input:match("^[oO][rR][gG][ \t]*(%d+)[ \t]*$")
     if org ~= nil then
-        insn = { org = tonumber(org) }
+        org_insn = { org = tonumber(org) --[[@as integer]] }
     end
-    return insn
+    return org_insn
 end
 
 ---Parse a load file into a program
@@ -77,11 +78,11 @@ local function parse_load_file(input)
         line = line:match("^([^;]*);") or line
 
         if #line ~= 0 then
-            local insn = parse_insn(line) or parse_org_insn(line)
-            if insn == nil then
+            local line_insn = parse_insn(line) or parse_org_insn(line)
+            if line_insn == nil then
                 return nil
             end
-            table.insert(program.insns, insn)
+            table.insert(program.insns, line_insn)
         end
     end
 

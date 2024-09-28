@@ -1,3 +1,4 @@
+local insn              = require "deimos.data.insn"
 local Lens              = require "deimos.data.lens"
 local Queue             = require "deimos.data.queue"
 local parser            = require "deimos.parser"
@@ -57,7 +58,7 @@ function Mars:initialize(programs)
 
     self.core = {}
     for _ = 1, core_size do
-        table.insert(self.core, tables.clone(initial_insn))
+        table.insert(self.core, insn.Insn:new(initial_insn))
     end
 
     self.cycles = 0
@@ -67,11 +68,11 @@ function Mars:initialize(programs)
     for id, program in ipairs(programs) do
         local j = 1
         local org = 0
-        for _, insn in ipairs(program.insns) do
-            if insn["org"] ~= nil then
-                org = insn["org"]
+        for _, program_insn in ipairs(program.insns) do
+            if program_insn["org"] ~= nil then
+                org = program_insn["org"]
             else
-                self.core[pc + j] = tables.clone(insn)
+                self.core[pc + j] = insn.Insn:new(program_insn)
                 j = j + 1
             end
         end
@@ -129,16 +130,16 @@ end
 
 ---@type table<Opcode, fun(x: integer, y: integer): integer?>
 local BINOPS = {
-    [types.Opcode.ADD] = function(x, y) return x + y end,
-    [types.Opcode.SUB] = function(x, y) return x + y end,
-    [types.Opcode.MUL] = function(x, y) return x + y end,
-    [types.Opcode.DIV] = function(x, y)
+    [insn.Opcode.ADD] = function(x, y) return x + y end,
+    [insn.Opcode.SUB] = function(x, y) return x + y end,
+    [insn.Opcode.MUL] = function(x, y) return x + y end,
+    [insn.Opcode.DIV] = function(x, y)
         if y == 0 then
             return nil
         end
         return math.floor(x / y)
     end,
-    [types.Opcode.MOD] = function(x, y)
+    [insn.Opcode.MOD] = function(x, y)
         if y == 0 then
             return nil
         end
@@ -150,21 +151,21 @@ local BINOPS = {
 ---@param warrior Warrior Warrior to execute instruction from
 function Mars:execute_warrior_insn(warrior)
     local task = warrior.tasks:popleft() --[[@as WarriorTask]]
-    local insn = self:fetch(task.pc)
+    local pc_insn = self:fetch(task.pc)
 
     self:process_hook("warrior.begin", {
         cycle = self.cycles,
         warrior = warrior,
         pc = task.pc,
-        insn = insn
+        insn = pc_insn
     })
 
     local a_operand = self:compute_operand(task.pc, "A")
     local b_operand = self:compute_operand(task.pc, "B")
 
-    local a_lens, b_lens = Lens.get_modifier_lenses(insn.modifier, a_operand.insn, b_operand.insn)
+    local a_lens, b_lens = Lens.get_modifier_lenses(pc_insn.modifier, a_operand.insn, b_operand.insn)
     if a_lens == nil or b_lens == nil then
-        error(string.format("unknown modifier %s at PC=%d", insn.modifier, task.pc))
+        error(string.format("unknown modifier %s at PC=%d", pc_insn.modifier, task.pc))
     end
 
     ---Generate an opcode handler for an arithmetic operation
@@ -197,15 +198,15 @@ function Mars:execute_warrior_insn(warrior)
         --[[ 5.5.1 DAT
         No additional processing takes place.  This effectively removes the
         current task from the current warrior's task queue. ]]
-        [types.Opcode.DAT] = function()
+        [insn.Opcode.DAT] = function()
             return {}
         end,
 
         --[[ 5.5.2 MOV
         MOV replaces the B-target with the A-value and queues the next
         instruction (PC + 1). ]]
-        [types.Opcode.MOV] = function()
-            if insn.modifier == types.Modifier.I then
+        [insn.Opcode.MOV] = function()
+            if insn.modifier == insn.Modifier.I then
                 self:set(b_operand.write_pc, tables.clone(a_operand.insn))
             else
                 b_lens:set(a_lens:get())
@@ -217,19 +218,19 @@ function Mars:execute_warrior_insn(warrior)
         ADD replaces the B-target with the sum of the A-value and the B-value
         (A-value + B-value) and queues the next instruction (PC + 1).  ADD.I
         functions as ADD.F would. ]]
-        [types.Opcode.ADD] = handle_arithmetic_opcode(types.Opcode.ADD),
+        [insn.Opcode.ADD] = handle_arithmetic_opcode(insn.Opcode.ADD),
 
         --[[ 5.5.4 SUB
         SUB replaces the B-target with the difference of the B-value and the
         A-value (B-value - A-value) and queues the next instruction (PC + 1).
         SUB.I functions as SUB.F would. ]]
-        [types.Opcode.SUB] = handle_arithmetic_opcode(types.Opcode.SUB),
+        [insn.Opcode.SUB] = handle_arithmetic_opcode(insn.Opcode.SUB),
 
         --[[ 5.5.5 MUL
         MUL replaces the B-target with the product of the A-value and the
         B-value (A-value * B-value) and queues the next instruction (PC + 1).
         MUL.I functions as MUL.F would. ]]
-        [types.Opcode.MUL] = handle_arithmetic_opcode(types.Opcode.MUL),
+        [insn.Opcode.MUL] = handle_arithmetic_opcode(insn.Opcode.MUL),
 
         --[[ 5.5.6 DIV
         DIV replaces the B-target with the integral result of dividing the
@@ -237,7 +238,7 @@ function Mars:execute_warrior_insn(warrior)
         instruction (PC + 1).  DIV.I functions as DIV.F would. If the
         A-value is zero, the B-value is unchanged and the current task is
         removed from the warrior's task queue. ]]
-        [types.Opcode.DIV] = handle_arithmetic_opcode(types.Opcode.DIV),
+        [insn.Opcode.DIV] = handle_arithmetic_opcode(insn.Opcode.DIV),
 
         --[[ 5.5.7 MOD
         MOD replaces the B-target with the integral remainder of dividing the
@@ -245,11 +246,11 @@ function Mars:execute_warrior_insn(warrior)
         instruction (PC + 1).  MOD.I functions as MOD.F would. If the
         A-value is zero, the B-value is unchanged and the current task is
         removed from the warrior's task queue. ]]
-        [types.Opcode.MOD] = handle_arithmetic_opcode(types.Opcode.MOD),
+        [insn.Opcode.MOD] = handle_arithmetic_opcode(insn.Opcode.MOD),
 
         --[[ 5.5.8 JMP
         JMP queues the sum of the program counter and the A-pointer. ]]
-        [types.Opcode.JMP] = function()
+        [insn.Opcode.JMP] = function()
             return { next_pc = a_operand.read_pc }
         end,
 
@@ -259,7 +260,7 @@ function Mars:execute_warrior_insn(warrior)
         Otherwise, the next instruction is queued (PC + 1).  JMZ.I functions
         as JMZ.F would, i.e. it jumps if both the A-number and the B-number
         of the B-instruction are zero. ]]
-        [types.Opcode.JMZ] = function()
+        [insn.Opcode.JMZ] = function()
             local next_pc = (task.pc + 1) % #self.core
             if tables.every(b_lens:get(), function(v) return v == 0 end) then
                 next_pc = a_operand.read_pc
@@ -274,7 +275,7 @@ function Mars:execute_warrior_insn(warrior)
         as JMN.F would, i.e. it jumps if both the A-number and the B-number
         of the B-instruction are non-zero. This is not the negation of the
         condition for JMZ.F. ]]
-        [types.Opcode.JMN] = function()
+        [insn.Opcode.JMN] = function()
             local next_pc = (task.pc + 1) % #self.core
             if tables.every(b_lens:get(), function(v) return v ~= 0 end) then
                 next_pc = a_operand.read_pc
@@ -290,7 +291,7 @@ function Mars:execute_warrior_insn(warrior)
         as DJN.F would, i.e. it decrements both both A/B-numbers of the B-value
         and the B-target, and jumps if both A/B-numbers of the B-value are
         non-zero. ]]
-        [types.Opcode.DJN] = function()
+        [insn.Opcode.DJN] = function()
             local next_pc = (task.pc + 1) % #self.core
             local xs = b_lens:update(function(x) return x - 1 end)
             if tables.every(xs, function(v) return v ~= 0 end) then
@@ -304,10 +305,10 @@ function Mars:execute_warrior_insn(warrior)
         comparison is equal, the instruction after the next instruction
         (PC + 2) is queued (skipping the next instruction).  Otherwise, the
         the next instruction is queued (PC + 1). ]]
-        [types.Opcode.CMP] = function()
+        [insn.Opcode.CMP] = function()
             local offset = 1
             local cond = false
-            if insn.modifier == types.Modifier.I then
+            if insn.modifier == insn.Modifier.I then
                 cond = a_operand.insn.opcode == b_operand.insn.opcode
                     and a_operand.insn.modifier == b_operand.insn.modifier
                     and a_operand.insn.a_mode == b_operand.insn.a_mode
@@ -329,7 +330,7 @@ function Mars:execute_warrior_insn(warrior)
         the B-value, the instruction after the next instruction (PC + 2) is
         queued (skipping the next instruction).  Otherwise, the next
         instruction is queued (PC + 1).  SLT.I functions as SLT.F would.]]
-        [types.Opcode.SLT] = function()
+        [insn.Opcode.SLT] = function()
             local offset = 1
             local pairs = tables.zip(a_lens:get(), b_lens:get())
             if tables.every(pairs, function(p) return p[1] < p[2] end) then
@@ -342,7 +343,7 @@ function Mars:execute_warrior_insn(warrior)
         SPL queues the next instruction (PC + 1) and then queues the sum of
         the program counter and A-pointer. If the queue is full, only the
         next instruction is queued.]]
-        [types.Opcode.SPL] = function()
+        [insn.Opcode.SPL] = function()
             return {
                 next_pc = (task.pc + 1) % #self.core,
                 new_pc = a_operand.write_pc
@@ -350,16 +351,16 @@ function Mars:execute_warrior_insn(warrior)
         end
     }
 
-    local handler = opcode_handlers[insn.opcode]
+    local handler = opcode_handlers[pc_insn.opcode]
     if handler == nil then
-        error(string.format("unknown opcode %s at PC=%d", insn.opcode, task.pc))
+        error(string.format("unknown opcode %s at PC=%d", pc_insn.opcode, task.pc))
     end
 
     self:process_hook("warrior.insn", {
         cycle = self.cycles,
         warrior = warrior,
         pc = task.pc,
-        insn = insn,
+        insn = pc_insn,
         a_operand = a_operand,
         b_operand = b_operand
     })
@@ -369,7 +370,7 @@ function Mars:execute_warrior_insn(warrior)
         cycle = self.cycles,
         warrior = warrior,
         pc = task.pc,
-        insn = insn,
+        insn = pc_insn,
         task_update = update
     })
     if update.next_pc ~= nil then
@@ -387,7 +388,7 @@ function Mars:execute_warrior_insn(warrior)
             cycle = self.cycles,
             warrior = warrior,
             pc = task.pc,
-            insn = insn
+            insn = pc_insn
         })
         self.warriors_by_id[warrior.id] = nil
     end
@@ -441,21 +442,21 @@ function Mars:compute_operand(pc, operand)
     ---@type nil | integer
     local post_inc_pc = nil
 
-    local insn = self:fetch(pc)
-    local mode = (operand == "A" and insn.a_mode) or insn.b_mode
-    local value = (operand == "A" and insn.a_number) or insn.b_number
+    local pc_insn = self:fetch(pc)
+    local mode = (operand == "A" and pc_insn.a_mode) or pc_insn.b_mode
+    local value = (operand == "A" and pc_insn.a_number) or pc_insn.b_number
 
-    if mode ~= types.Mode.Immediate then
+    if mode ~= insn.Mode.Immediate then
         read_pc = clamp(#self.core, read_distance, read_pc, value)
         write_pc = clamp(#self.core, write_distance, write_pc, value)
 
-        if mode ~= types.Mode.Direct then
+        if mode ~= insn.Mode.Direct then
             -- TODO: Add support for PreDecrementA
-            if mode == types.Mode.PreDecrementB then
+            if mode == insn.Mode.PreDecrementB then
                 local predec_insn = self:fetch(write_pc)
                 predec_insn.b_number = (predec_insn.b_number + #self.core - 1) % #self.core
                 -- TODO: Add support for PostIncrementA
-            elseif mode == types.Mode.PostIncrementB then
+            elseif mode == insn.Mode.PostIncrementB then
                 post_inc_pc = write_pc
             end
 

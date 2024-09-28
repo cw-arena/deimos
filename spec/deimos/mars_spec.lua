@@ -89,13 +89,13 @@ describe("Mars", function()
                 read_pc = 3,
                 write_pc = 3,
             }, vm:compute_operand(4, "A"))
-            assert.is.equal("DAT.F #0, #0", types.formatInsn(vm.core[4]))
+            assert.is.equal("DAT.F #0, #0", vm.core[4]:format())
             assert.are.same({
                 insn = vm.core[6],
                 read_pc = 5,
                 write_pc = 5,
             }, vm:compute_operand(4, "B"))
-            assert.is.equal("CMP.A #0, #1", types.formatInsn(vm.core[6]))
+            assert.is.equal("CMP.A #0, #1", vm.core[6]:format())
         end)
 
         it("respects read limits", function()
@@ -181,9 +181,9 @@ describe("Mars", function()
                 local cycle = 0
                 local warrior = vm.warriors_by_id["1"]
                 local pc = 1
-                local insn = parser.parse_insn("ADD.AB #4, $-1")
+                local pc_insn = parser.parse_insn("ADD.AB #4, $-1")
                 local a_operand = {
-                    insn = insn,
+                    insn = pc_insn,
                     read_pc = 1,
                     write_pc = 1
                 }
@@ -199,7 +199,7 @@ describe("Mars", function()
                             cycle = cycle,
                             warrior = warrior,
                             pc = pc,
-                            insn = insn,
+                            insn = pc_insn,
                         },
                         data
                     )
@@ -209,7 +209,7 @@ describe("Mars", function()
                             cycle = cycle,
                             warrior = warrior,
                             pc = pc,
-                            insn = insn,
+                            insn = pc_insn,
                             a_operand = a_operand,
                             b_operand = b_operand,
                         },
@@ -221,7 +221,7 @@ describe("Mars", function()
                             cycle = cycle,
                             warrior = warrior,
                             pc = pc,
-                            insn = insn,
+                            insn = pc_insn,
                             task_update = { next_pc = 2 }
                         },
                         data
