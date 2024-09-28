@@ -1,7 +1,7 @@
+local Lens              = require "deimos.data.lens"
 local Queue             = require "deimos.data.queue"
 local parser            = require "deimos.parser"
 local types             = require "deimos.types"
-local lens              = require "deimos.vm.lens"
 local tables            = require "deimos.tables"
 
 local DEFAULT_CORE_SIZE = 8000
@@ -15,7 +15,7 @@ local INITIAL_INSN      = parser.parse_insn("DAT.F #0, #0") --[[@as Insn]]
 ---@field core table<integer, Insn>
 ---@field cycles integer
 ---@field warriors_by_id table<string, Warrior>
----@field hooks table<string, Queue>
+---@field private hooks table<string, Queue>
 local Mars              = {}
 
 ---@alias MarsOptions { core_size?: integer, initial_insn?: Insn, read_distance?: integer, write_distance?: integer }
@@ -125,17 +125,6 @@ function Mars:get_match_state()
     }
 end
 
----@type table<Modifier, [LensFactory, LensFactory]>
-local MODIFIER_LENS_FACTORIES = {
-    [types.Modifier.A] = { lens.a, lens.a },
-    [types.Modifier.B] = { lens.b, lens.b },
-    [types.Modifier.AB] = { lens.a, lens.b },
-    [types.Modifier.BA] = { lens.b, lens.a },
-    [types.Modifier.F] = { lens.ab, lens.ab },
-    [types.Modifier.I] = { lens.ab, lens.ab },
-    [types.Modifier.X] = { lens.ab, lens.ba },
-}
-
 ---@alias OpcodeHandler fun(): WarriorTaskUpdate
 
 ---@type table<Opcode, fun(x: integer, y: integer): integer?>
@@ -173,13 +162,10 @@ function Mars:execute_warrior_insn(warrior)
     local a_operand = self:compute_operand(task.pc, "A")
     local b_operand = self:compute_operand(task.pc, "B")
 
-    local lens_factories = MODIFIER_LENS_FACTORIES[insn.modifier]
-    if lens_factories == nil then
+    local a_lens, b_lens = Lens.get_modifier_lenses(insn.modifier, a_operand.insn, b_operand.insn)
+    if a_lens == nil or b_lens == nil then
         error(string.format("unknown modifier %s at PC=%d", insn.modifier, task.pc))
     end
-
-    local a_lens = lens_factories[1](a_operand.insn)
-    local b_lens = lens_factories[2](b_operand.insn)
 
     ---Generate an opcode handler for an arithmetic operation
     ---@param opcode Opcode Arithmetic opcode to handle

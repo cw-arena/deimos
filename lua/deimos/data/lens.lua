@@ -1,9 +1,9 @@
+local types = require "deimos.types"
+
 ---@class Lens
 ---@field private _get fun(): integer[]
 ---@field private _set fun(xs: integer[])
 local Lens = {}
-
----@alias LensFactory fun(insn: Insn): Lens
 
 ---Create new lens from accessors
 ---@param get fun(): integer[]
@@ -102,9 +102,28 @@ local function ba(insn)
     )
 end
 
+---@alias LensFactory fun(insn: Insn): Lens
+---@type table<Modifier, [LensFactory, LensFactory]>
+local MODIFIER_LENS_FACTORIES = {
+    [types.Modifier.A] = { a, a },
+    [types.Modifier.B] = { b, b },
+    [types.Modifier.AB] = { a, b },
+    [types.Modifier.BA] = { b, a },
+    [types.Modifier.F] = { ab, ab },
+    [types.Modifier.I] = { ab, ab },
+    [types.Modifier.X] = { ab, ba },
+}
+
+---Get the lenses for an instruction modifier
+---@param modifier Modifier
+---@return Lens|nil, Lens|nil
+local function get_modifier_lenses(modifier, a_insn, b_insn)
+    local factories = MODIFIER_LENS_FACTORIES[modifier]
+    if factories ~= nil then
+        return factories[1](a_insn), factories[2](b_insn)
+    end
+end
+
 return {
-    a = a,
-    b = b,
-    ab = ab,
-    ba = ba
+    get_modifier_lenses = get_modifier_lenses
 }

@@ -1,6 +1,6 @@
+local Mars = require "deimos.mars"
 local parser = require "deimos.parser"
 local types = require "deimos.types"
-local Mars = require "deimos.vm.mars"
 
 local function create_test_mars(...)
     local programs = {}
