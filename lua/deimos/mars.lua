@@ -2,7 +2,6 @@ local insn              = require "deimos.data.insn"
 local Lens              = require "deimos.data.lens"
 local Queue             = require "deimos.data.queue"
 local parser            = require "deimos.parser"
-local types             = require "deimos.types"
 local tables            = require "deimos.tables"
 
 local DEFAULT_CORE_SIZE = 8000
@@ -11,6 +10,32 @@ local DEFAULT_CORE_SIZE = 8000
 ---@type Insn
 local INITIAL_INSN      = parser.parse_insn("DAT.F #0, #0") --[[@as Insn]]
 
+---@enum MatchStatus
+local MatchStatus       = {
+    RUNNING = "RUNNING",
+    WIN = "WIN",
+    TIE = "TIE",
+}
+
+---@alias MatchState { status: MatchStatus, warrior_ids: string[] }
+
+---@enum HookAction
+local HookAction        = {
+    PAUSE = "PAUSE",
+    RESUME = "RESUME",
+    SKIP = "SKIP"
+}
+
+---@alias Hook fun(event: string, data: any): HookAction
+
+---@alias WarriorMetadata { name?: string, author?: string, strategy?: string }
+---@alias WarriorProgram { metadata: WarriorMetadata, insns: ProgramInsn[] }
+---@alias WarriorTask { id: number, pc: integer }
+---@alias WarriorTaskUpdate { next_pc?: integer, new_pc?: integer }
+---@alias Warrior { id: string, tasks: Queue, next_task_id: integer, program: WarriorProgram }
+
+---@alias MarsOptions { core_size?: integer, initial_insn?: Insn, read_distance?: integer, write_distance?: integer }
+
 ---@class Mars
 ---@field options MarsOptions
 ---@field core table<integer, Insn>
@@ -18,8 +43,6 @@ local INITIAL_INSN      = parser.parse_insn("DAT.F #0, #0") --[[@as Insn]]
 ---@field warriors_by_id table<string, Warrior>
 ---@field private hooks table<string, Queue>
 local Mars              = {}
-
----@alias MarsOptions { core_size?: integer, initial_insn?: Insn, read_distance?: integer, write_distance?: integer }
 
 ---Create a new [Mars](lua://Mars)
 ---@param options? MarsOptions
@@ -93,7 +116,7 @@ end
 ---@return MatchState
 function Mars:execute()
     local state = self:get_match_state()
-    while state.status == types.MatchStatus.RUNNING do
+    while state.status == MatchStatus.RUNNING do
         self:execute_cycle()
         state = self:get_match_state()
     end
@@ -106,7 +129,7 @@ function Mars:execute_cycle()
         self:execute_warrior_insn(warrior)
     end
     local state = self:get_match_state()
-    if state.status ~= types.MatchStatus.RUNNING then
+    if state.status ~= MatchStatus.RUNNING then
         self:process_hook("mars.end", state)
     end
     self.cycles = self.cycles + 1
@@ -121,7 +144,7 @@ function Mars:get_match_state()
     end
     return {
         -- TODO: Compute status from living warriors
-        status = types.MatchStatus.RUNNING,
+        status = MatchStatus.RUNNING,
         warrior_ids = warrior_ids,
     }
 end
@@ -508,14 +531,14 @@ function Mars:process_hook(event, data)
     end
     for hook in hooks:items() do
         local action = hook(event, data)
-        if action == types.HookAction.PAUSE then
+        if action == HookAction.PAUSE then
             if not coroutine.running() then
                 error("tried to pause but not in coroutine")
             end
             coroutine.yield()
-        elseif action == types.HookAction.SKIP then
+        elseif action == HookAction.SKIP then
             break
-        elseif action ~= types.HookAction.RESUME then
+        elseif action ~= HookAction.RESUME then
             error(string.format("unknown hook action '%s'", event))
         end
     end
