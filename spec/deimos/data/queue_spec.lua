@@ -42,6 +42,10 @@ describe("Queue", function()
                 queue:pushright({ task_id = i, pc = 0 })
                 assert.is.equal(i, queue:length())
             end
+            for i = 1, 10 do
+                queue:popleft()
+                assert.is.equal(10 - i, queue:length())
+            end
         end)
     end)
 

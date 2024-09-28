@@ -88,6 +88,17 @@ function Mars:initialize(programs)
     end
 end
 
+---Execute cycles until game terminates
+---@return MatchState
+function Mars:execute()
+    local state = self:get_match_state()
+    while state.status == types.MatchStatus.RUNNING do
+        self:execute_cycle()
+        state = self:get_match_state()
+    end
+    return state
+end
+
 ---Execute a single instruction from each living warrior
 function Mars:execute_cycle()
     for _, warrior in pairs(self.warriors_by_id) do
@@ -101,7 +112,7 @@ function Mars:execute_cycle()
 end
 
 ---Get state of currently executing match
----@return { status: MatchStatus, warrior_ids: string[] }
+---@return MatchState
 function Mars:get_match_state()
     local warrior_ids = {}
     for id, _ in pairs(self.warriors_by_id) do
@@ -515,6 +526,8 @@ function Mars:process_hook(event, data)
                 error("tried to pause but not in coroutine")
             end
             coroutine.yield()
+        elseif action == types.HookAction.SKIP then
+            break
         elseif action ~= types.HookAction.RESUME then
             error(string.format("unknown hook action '%s'", event))
         end

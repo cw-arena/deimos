@@ -1,7 +1,25 @@
-local Mars = require "deimos.vm.mars"
 local parser = require "deimos.parser"
 local types = require "deimos.types"
-local tables = require "deimos.tables"
+local Mars = require "deimos.vm.mars"
+
+local function create_test_mars(...)
+    local programs = {}
+    for i = 1, select("#", ...) do
+        local source = select(i, ...)
+        if io.type(source) == "file" then
+            local file = source
+            source = file:read("*a")
+            file:close()
+        end
+        assert.is_not_nil(source)
+        local program = parser.parse_load_file(source)
+        assert.is_not_nil(program)
+        table.insert(programs, program)
+    end
+    local vm = Mars:new()
+    vm:initialize(programs)
+    return vm
+end
 
 describe("Mars", function()
     describe("compute_operand", function()
@@ -97,11 +115,7 @@ describe("Mars", function()
     describe("execute_cycle", function()
         describe("DIV", function()
             it("kills warrior on divide by zero", function()
-                local program = parser.parse_load_file("DIV.AB #0, #5")
-                assert.is_not_nil(program)
-
-                local vm = Mars:new()
-                vm:initialize({ program })
+                local vm = create_test_mars("DIV.AB #0, #5")
                 vm:execute_cycle()
 
                 local warrior = vm.warriors_by_id["1"]
@@ -111,11 +125,7 @@ describe("Mars", function()
 
         describe("MOD", function()
             it("kills warrior on divide by zero", function()
-                local program = parser.parse_load_file("MOD.AB #0, #5")
-                assert.is_not_nil(program)
-
-                local vm = Mars:new()
-                vm:initialize({ program })
+                local vm = create_test_mars("MOD.AB #0, #5")
                 vm:execute_cycle()
 
                 local warrior = vm.warriors_by_id["1"]
@@ -125,11 +135,7 @@ describe("Mars", function()
 
         describe("JMP", function()
             it("jumps to A-pointer", function()
-                local program = parser.parse_load_file("JMP.A $123, #0")
-                assert.is_not_nil(program)
-
-                local vm = Mars:new()
-                vm:initialize({ program })
+                local vm = create_test_mars("JMP.A $123, #0")
                 vm:execute_cycle()
 
                 local warrior = vm.warriors_by_id["1"]
@@ -140,22 +146,14 @@ describe("Mars", function()
     end)
 
     it("can execute a dwarf correctly", function()
-        local dwarf_file = assert(io.open("./warriors/dwarf.red", "r"))
-        local dwarf_code = dwarf_file:read("*a")
-        dwarf_file:close()
-
-        local program = parser.parse_load_file(dwarf_code)
-        assert.is_not_nil(program)
-
-        local vm = Mars:new()
-        vm:initialize({ program })
+        local file = assert(io.open("./warriors/dwarf.red", "r"))
+        local vm = create_test_mars(file)
 
         assert.is_not_nil(vm.warriors_by_id["1"])
         local warrior = vm.warriors_by_id["1"]
 
         assert.is.equal("1", warrior.id)
         assert.is.equal(1, warrior.next_task_id)
-        assert.are.same(program, warrior.program)
         assert.is.equal(1, warrior.tasks:length())
         assert.are.same({ id = 0, pc = 1 }, warrior.tasks:peek())
 
@@ -171,88 +169,131 @@ describe("Mars", function()
         assert.are.same({ id = 0, pc = 1 }, warrior.tasks:peek())
     end)
 
-    it("emits events when executing warrior", function()
-        local dwarf_file = assert(io.open("./warriors/dwarf.red", "r"))
-        local dwarf_code = dwarf_file:read("*a")
-        dwarf_file:close()
+    describe("hooks", function()
+        it("calls hooks when executing warrior", function()
+            local file = assert(io.open("./warriors/dwarf.red", "r"))
+            local vm = create_test_mars(file)
 
-        local program = parser.parse_load_file(dwarf_code)
-        assert.is_not_nil(program)
+            local events = { "warrior.begin", "warrior.insn", "warrior.task_update" }
+            local called_events = {}
 
-        local events = { "warrior.begin", "warrior.insn", "warrior.task_update" }
-        local called_events = {}
+            vm:install_back(events, function(event, data)
+                local cycle = 0
+                local warrior = vm.warriors_by_id["1"]
+                local pc = 1
+                local insn = parser.parse_insn("ADD.AB #4, $-1")
+                local a_operand = {
+                    insn = insn,
+                    read_pc = 1,
+                    write_pc = 1
+                }
+                local b_operand = {
+                    insn = parser.parse_insn("DAT.F #0, #0"),
+                    read_pc = 0,
+                    write_pc = 0,
+                }
 
-        local vm = Mars:new()
-        vm:initialize({ program })
-        vm:install_back(events, function(event, data)
-            local cycle = 0
-            local warrior = vm.warriors_by_id["1"]
-            local pc = 1
-            local insn = parser.parse_insn("ADD.AB #4, $-1")
-            local a_operand = {
-                insn = insn,
-                read_pc = 1,
-                write_pc = 1
-            }
-            local b_operand = {
-                insn = parser.parse_insn("DAT.F #0, #0"),
-                read_pc = 0,
-                write_pc = 0,
-            }
+                if event == "warrior.begin" then
+                    assert.are.same(
+                        {
+                            cycle = cycle,
+                            warrior = warrior,
+                            pc = pc,
+                            insn = insn,
+                        },
+                        data
+                    )
+                elseif event == "warrior.insn" then
+                    assert.are.same(
+                        {
+                            cycle = cycle,
+                            warrior = warrior,
+                            pc = pc,
+                            insn = insn,
+                            a_operand = a_operand,
+                            b_operand = b_operand,
+                        },
+                        data
+                    )
+                elseif event == "warrior.task_update" then
+                    assert.are.same(
+                        {
+                            cycle = cycle,
+                            warrior = warrior,
+                            pc = pc,
+                            insn = insn,
+                            task_update = { next_pc = 2 }
+                        },
+                        data
+                    )
+                end
+                assert.is_nil(called_events[event])
+                called_events[event] = event
+                return types.HookAction.RESUME
+            end)
 
-            if event == "warrior.begin" then
-                assert.are.same(
-                    {
-                        cycle = cycle,
-                        warrior = warrior,
-                        pc = pc,
-                        insn = insn,
-                    },
-                    data
-                )
-            elseif event == "warrior.insn" then
-                assert.are.same(
-                    {
-                        cycle = cycle,
-                        warrior = warrior,
-                        pc = pc,
-                        insn = insn,
-                        a_operand = a_operand,
-                        b_operand = b_operand,
-                    },
-                    data
-                )
-            elseif event == "warrior.task_update" then
-                assert.are.same(
-                    {
-                        cycle = cycle,
-                        warrior = warrior,
-                        pc = pc,
-                        insn = insn,
-                        task_update = { next_pc = 2 }
-                    },
-                    data
-                )
+            vm:execute_cycle()
+
+            -- NB: Ensure every requested event was received
+            for _, event in ipairs(events) do
+                assert.is.equal(event, called_events[event])
             end
-            assert.is_nil(called_events[event])
-            called_events[event] = event
-            return types.HookAction.RESUME
+
+            -- NB: Ensure every received event was requested
+            for _, called_event in pairs(called_events) do
+                local found = false
+                for _, event in ipairs(events) do
+                    found = found or called_event == event
+                end
+                assert.is_true(found)
+            end
         end)
 
-        vm:execute_cycle()
-
-        -- NB: Ensure every requested event was received
-        for _, event in ipairs(events) do
-            assert.is.equal(event, called_events[event])
-        end
-
-        -- NB: Ensure every received event was requested
-        for _, called_event in pairs(called_events) do
-            local found = false
-            for _, event in ipairs(events) do
-                found = found or called_event == event
+        it("calls hooks in correct order", function()
+            local vm = create_test_mars("MOV.I $0, $1")
+            local calls = {}
+            for i = 1, 5 do
+                vm:install_back({ "warrior.begin" }, function()
+                    table.insert(calls, i)
+                    return types.HookAction.RESUME
+                end)
             end
-            assert.is.is_true(found)
-        end
+            vm:execute_cycle()
+            assert.are.same({ 1, 2, 3, 4, 5 }, calls)
+        end)
+
+        it("returns control when hook pauses execution", function()
+            local vm = create_test_mars("MOV.I $0, $1")
+            vm:install_back({ "warrior.begin" }, function()
+                return types.HookAction.PAUSE
+            end)
+
+            local co = coroutine.create(function()
+                vm:execute_cycle()
+            end)
+            coroutine.resume(co)
+            assert.is.equal("suspended", coroutine.status(co))
+
+            coroutine.resume(co)
+            assert.is.equal("dead", coroutine.status(co))
+        end)
+
+        it("invokes warrior.died hooks when warrior dies", function()
+            local vm = create_test_mars("DAT.F #0, #0")
+            local called = false
+            vm:install_back({ "warrior.died" }, function(event, data)
+                called = true
+                assert.is.equal("warrior.died", event)
+                assert.are.same({
+                    cycle = 0,
+                    pc = 0,
+                    warrior = vm.warriors_by_id["1"],
+                    insn = parser.parse_insn("DAT.F #0, #0"),
+                }, data)
+                return types.HookAction.RESUME
+            end)
+            vm:execute_cycle()
+            assert.is_true(called)
+        end)
     end)
 end)

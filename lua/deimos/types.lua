@@ -65,6 +65,8 @@ local MatchStatus = {
     TIE = "TIE",
 }
 
+---@alias MatchState { status: MatchStatus, warrior_ids: string[] }
+
 ---@alias Insn { opcode: Opcode, modifier: Modifier, a_mode: Mode, a_number: integer, b_mode: Mode, b_number: integer }
 ---@alias OrgInsn { org: integer }
 
@@ -93,7 +95,9 @@ end
 local HookAction = {
     PAUSE = "PAUSE",
     RESUME = "RESUME",
+    SKIP = "SKIP"
 }
+
 ---@alias Hook fun(event: string, data: any): HookAction
 
 return {
