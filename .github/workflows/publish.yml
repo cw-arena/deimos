@@ -20,6 +20,6 @@ jobs:
       - shell: bash
         env:
           LUAROCKS_API_KEY: ${{ secrets.LUAROCKS_API_KEY }}
+          ROCKSPEC: cw-deimos-${{ github.ref_name }}.rockspec
         run: >
-          luarocks upload --api-key "$LUAROCKS_API_KEY"
-            cw-deimos-${{ github.ref_name }}.rockspec
+          luarocks upload --api-key "$LUAROCKS_API_KEY" "$ROCKSPEC"
