@@ -1,0 +1,23 @@
+name: publish
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+-[0-9]+"
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: awalsh128/cache-apt-pkgs-action@v1.4.2
+        with:
+          packages: luarocks
+      - uses: actions/cache@v4
+        with:
+          key: ${{ hashFiles('./*.rockspec') }}
+          path: ~/.luarocks
+      - run: luarocks --local make
+      - run: luarocks --local test
+      - shell: bash
+        env:
+          LUAROCKS_API_KEY: ${{ secrets.LUAROCKS_API_KEY }}
+        run: luarocks upload --api-key "$LUAROCKS_API_KEY"
