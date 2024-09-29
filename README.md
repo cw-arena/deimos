@@ -13,7 +13,7 @@
 The easiest way to install is by using [LuaRocks](https://luarocks.org/):
 
 ```
-$ luarocks --local install deimos
+$ luarocks --local install cw-deimos
 ```
 
 If you do not have LuaRocks installed, see [Installing LuaRocks](#installing-luarocks) for installation instructions.
